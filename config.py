@@ -56,6 +56,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "tecla_grabar": "^g",
     # Teclas que se pulsan después de escribir el código del producto.
     "teclas_tras_codigo_producto": "{ENTER}",
+    # Tras el código y Enter, SisFaCon deja seleccionada la Cantidad: se escribe
+    # la cantidad de la escuela y se pulsan estas teclas para añadir la línea.
+    "teclas_tras_cantidad": "{ENTER}",
+    # True: «descripcion_producto» está calibrada sobre la fila azul de entrada
+    # (aparece al escribir el código y se vacía al añadir la línea).
+    # False: está sobre la primera línea de la tabla inferior.
+    "descripcion_en_fila_entrada": True,
 
     # --- Búsqueda de escuela ---------------------------------------------
     # "codigo" o "nombre": qué se escribe en «Texto búsqueda».
@@ -164,8 +171,13 @@ CALIBRATION_FIELDS: dict[str, dict[str, str]] = {
     },
     "descripcion_producto": {
         "ventana": "principal", "tipo": "region",
-        "descripcion": "Descripción del producto en la PRIMERA LÍNEA de la tabla inferior "
-                       "(aparece solo cuando el producto se añadió de verdad)",
+        "descripcion": "Descripción en la FILA AZUL DE ENTRADA (aparece al escribir el código "
+                       "del producto y se vacía al añadir la línea)",
+    },
+    "cantidad_linea": {
+        "ventana": "principal", "tipo": "region",
+        "descripcion": "Cantidad de la PRIMERA LÍNEA de la tabla inferior (opcional: "
+                       "comprueba que se escribió bien)",
     },
     "texto_busqueda": {
         "ventana": "busqueda", "tipo": "punto",

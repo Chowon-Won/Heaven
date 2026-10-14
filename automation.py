@@ -32,7 +32,8 @@ from day_manager import DayManager, DayStatus, InvoiceStatus, Mode, PrintStatus
 from error_recovery import Classified, RecoveryPolicy, WinKind, classify_window
 from logging_manager import OperationLogger
 from state_machine import STATE_LABELS, State, StateMachine
-from verification import codes_match, parse_conduce, parse_line_count, text_matches
+from verification import (codes_match, normalize_text, parse_conduce, parse_line_count,
+                          parse_quantity, text_matches)
 from window_detection import (CalibrationError, DriverError, EmergencyStop,
                               SisFaConDriver, WinInfo)
 
@@ -105,6 +106,7 @@ class InvoiceContext:
     print_confirmed: bool = False
     recovering: bool = False
     product_typed: bool = False   # ya se escribió el código del producto alguna vez
+    desc_seen: bool = False       # la descripción correcta apareció tras escribir el código
     attempts: int = 0
     notes: list[str] = field(default_factory=list)
 
@@ -446,8 +448,10 @@ class AutomationEngine:
     def _read_lines(self) -> int | None:
         # Si ya se comprobó en esta ejecución que es ilegible, no se pierde tiempo en OCR.
         if getattr(self, "_counter_warned", False) and self._counter_optional():
+            self._last_lines = None
             return None
-        return parse_line_count(self._read("contador_lineas"))
+        self._last_lines = parse_line_count(self._read("contador_lineas"))
+        return self._last_lines
 
     def _counter_optional(self) -> bool:
         """El contador puede omitirse si es ilegible y hay verificación por descripción."""
@@ -655,8 +659,20 @@ class AutomationEngine:
         self._poll_until(ctx, "verificar escuela", ok, self._verify_timeout())
         return True, last["code"]
 
-    def _product_ok(self, expect_lines: int = 1) -> tuple[bool, str]:
-        s, day = self.settings, self._day
+    def _desc_matches(self, desc: str | None) -> bool:
+        day = self._day
+        return text_matches(day["producto_texto_verificacion"] or day["producto_nombre"],
+                            desc, float(self.settings["umbral_similitud_producto"]))
+
+    def _product_ok(self, expect_lines: int = 1,
+                    ctx: InvoiceContext | None = None) -> tuple[bool, str]:
+        """¿Hay exactamente ``expect_lines`` líneas y es el producto esperado?
+
+        La descripción puede estar calibrada sobre la fila azul de entrada, que
+        SisFaCon vacía al añadir la línea: si ya se vio la descripción correcta
+        tras escribir el código (``ctx.desc_seen``), basta con el contador.
+        """
+        s = self.settings
         detail = []
         good = True
         if s["verificar_contador_lineas"]:
@@ -664,12 +680,31 @@ class AutomationEngine:
             detail.append(f"líneas={n if n is not None else 'ilegible'}")
             if n is not None or not self._counter_optional():
                 good &= n == expect_lines
+        if ctx is not None and self.driver.is_calibrated("cantidad_linea"):
+            want = int(ctx.inv.get("cantidad") or 0)
+            read = self._read("cantidad_linea")
+            got = parse_quantity(read)
+            detail.append(f"cantidad={got if got is not None else read}")
+            good &= got == want
         if s["verificar_descripcion_producto"]:
             desc = self._read("descripcion_producto")
             detail.append(f"descripción=«{desc}»")
-            good &= text_matches(day["producto_texto_verificacion"] or day["producto_nombre"],
-                                 desc, float(s["umbral_similitud_producto"]))
+            if self._desc_on_entry_row() and ctx is not None and ctx.desc_seen:
+                # Ya se vio el producto correcto en la fila azul; al añadir la línea
+                # esa fila se vacía: vacía = línea añadida.
+                cleared = not normalize_text(desc)
+                if not cleared:
+                    detail.append("la fila de entrada aún tiene el producto")
+                good &= cleared
+            else:
+                good &= self._desc_matches(desc)
         return good, ", ".join(detail)
+
+    def _desc_on_entry_row(self) -> bool:
+        return bool(self.settings["descripcion_en_fila_entrada"])
+
+    def _read_lines_cached(self) -> int | None:
+        return getattr(self, "_last_lines", None)
 
     def _product(self, ctx: InvoiceContext) -> None:
         day = self._day
@@ -690,6 +725,14 @@ class AutomationEngine:
                     return
                 raise FlowAbort(f"El formulario tiene líneas inesperadas ({detail}). "
                                 "Límpielo en SisFaCon antes de reintentar.", InvoiceStatus.ERROR)
+        if self.settings["verificar_descripcion_producto"] and self._desc_on_entry_row():
+            leftover = self._read("descripcion_producto")
+            if leftover and len(normalize_text(leftover)) >= 3:
+                # Un producto escrito antes y sin añadir sigue en la fila azul de
+                # entrada: escribir encima daría «10051005». Mejor parar.
+                raise FlowAbort(f"La fila de entrada de SisFaCon ya tiene un producto sin añadir "
+                                f"(«{leftover}»). Pulse «Cancelar» en SisFaCon y vuelva a "
+                                "intentarlo. No se grabó nada.", InvoiceStatus.ERROR)
         self._checkpoint(ctx)
         self._goto(State.ENTERING_PRODUCT, day["producto_codigo"])
         self._update(ctx)
@@ -701,10 +744,37 @@ class AutomationEngine:
         self.log.log("PRODUCTO_INTRODUCIDO", jornada=day, factura=ctx.inv)
         self._goto(State.VERIFYING_PRODUCT)
         self._update(ctx)
+        qty = int(ctx.inv.get("cantidad") or 0)
+        if qty <= 0:
+            raise FlowAbort("Esta escuela no tiene cantidad. Póngala en la pestaña Escuelas.",
+                            InvoiceStatus.ERROR)
+        if self.settings["verificar_descripcion_producto"] and self._desc_on_entry_row():
+            # 1) SisFaCon reconoce el código: la descripción aparece en la fila de
+            #    entrada y el cursor pasa a Cantidad (con el valor seleccionado).
+            seen = {"desc": None}
+
+            def recognised() -> bool:
+                seen["desc"] = self._read("descripcion_producto")
+                return self._desc_matches(seen["desc"])
+
+            if not self._poll_until(ctx, "reconocer producto", recognised, self._verify_timeout()):
+                self.log.log("PRODUCTO_INCORRECTO", f"descripción=«{seen['desc']}»", "ERROR",
+                             jornada=day, factura=ctx.inv)
+                raise FlowAbort(f"SisFaCon no reconoció el producto {day['producto_codigo']} "
+                                f"«{day['producto_nombre']}» (descripción leída: «{seen['desc']}»). "
+                                "No se grabó nada.", InvoiceStatus.ERROR)
+            ctx.desc_seen = True
+        else:
+            self._sleep(self._t("espera_estabilizacion"))
+        # 2) Cantidad: el valor ya viene seleccionado, se escribe encima y Enter.
+        self._scan(ctx, set())
+        self.driver.type_text(str(qty))
+        self.driver.send_keys(self.settings["teclas_tras_cantidad"])
+        self.log.log("INFO", f"Cantidad escrita: {qty}.", jornada=day, factura=ctx.inv)
         info = {"detail": ""}
 
         def ok() -> bool:
-            good, info["detail"] = self._product_ok(1)
+            good, info["detail"] = self._product_ok(1, ctx)
             return good
 
         if not self._poll_until(ctx, "verificar producto", ok,
@@ -734,7 +804,7 @@ class AutomationEngine:
         # Última comprobación justo antes de la operación irreversible.
         if not codes_match(inv["escuela_codigo"], self._read("codigo_centro")):
             raise FlowAbort("La escuela cambió antes de grabar.", InvoiceStatus.ERROR)
-        good, detail = self._product_ok(1)
+        good, detail = self._product_ok(1, ctx)
         if not good:
             raise FlowAbort(f"El producto cambió antes de grabar ({detail}).", InvoiceStatus.ERROR)
         if s["exigir_cambio_ultimo_conduce"] and self.driver.is_calibrated("ultimo_conduce"):

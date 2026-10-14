@@ -60,6 +60,10 @@ class SimulatedDriver(SisFaConDriver):
         self.no_match_selects_first = False  # Enter sin resultados elige la 1.ª fila
         self.keeps_school_after_save = False  # tras grabar no vuelve a <<CONTADO>>
         self.has_search_button = False    # «Buscar Centro» accesible como control
+        self.needs_qty_enter = True       # como SisFaCon real: código+Enter, Cantidad+Enter
+        self.desc_region_on_entry_row = True   # la descripción calibrada está en la fila azul
+        self._qty_buffer = ""
+        self._pending_desc = None
 
     # ------------------------------------------------------------ fallos
     def inject(self, event: str, code: str | None = None, times: int = 1, **kw) -> None:
@@ -145,6 +149,13 @@ class SimulatedDriver(SisFaConDriver):
                 if k == "{F7}":
                     self._open("search", "Seleccione un Cliente", "Texto búsqueda")
                     self.windows[self.foreground]["search"] = ""
+                elif k == "{ENTER}" and self._pending_desc is not None:
+                    code, desc = self._pending_desc             # Enter en Cantidad
+                    qty = int(self._qty_buffer) if self._qty_buffer.isdigit() else 1
+                    self.lines.append((code, desc, qty))
+                    self._pending_desc = None
+                    self._qty_buffer = ""
+                    self.entry_desc = ""
                 elif k == "{ENTER}" and self.cell_focused:
                     self._enter_product()
                 elif k == "^G":
@@ -208,7 +219,13 @@ class SimulatedDriver(SisFaConDriver):
     def type_text(self, text: str) -> None:
         self._check()
         self._delay()
-        if self.cell_focused and not self._modal_open():
+        if self._modal_open():
+            return
+        if self._pending_desc is not None:
+            if self._fault("qty_ignored"):
+                return                       # la cantidad no se sustituyó
+            self._qty_buffer = text          # la cantidad seleccionada se sustituye
+        elif self.cell_focused:
             self.cell_buffer += text
 
     def is_calibrated(self, name: str) -> bool:
@@ -227,7 +244,11 @@ class SimulatedDriver(SisFaConDriver):
             if name == "contador_lineas":
                 return None if self.counter_unreadable else f"{len(self.lines)} Linea(s)"
             if name == "descripcion_producto":
-                return self.entry_desc or (self.lines[-1][1] if self.lines else "")
+                if self.desc_region_on_entry_row:
+                    return self.entry_desc
+                return self.lines[-1][1] if self.lines else ""
+            if name == "cantidad_linea":
+                return str(self.lines[0][2]) if self.lines else ""
         return None
 
     def emergency_requested(self) -> bool:
@@ -290,7 +311,12 @@ class SimulatedDriver(SisFaConDriver):
         desc = self.products[code]
         if self._fault("wrong_product_desc", code):
             desc = "PRODUCTO DIFERENTE"
-        self.lines.append((code, desc))
+        if self.needs_qty_enter:
+            self._pending_desc = (code, desc)
+            self.entry_desc = desc
+            self.cell_focused = False
+            return
+        self.lines.append((code, desc, 1))
         self.entry_desc = ""
         self.cell_focused = False
 
@@ -308,7 +334,8 @@ class SimulatedDriver(SisFaConDriver):
         self.last_conduce += 1
         conduce = f"FCR {self.last_conduce:07d}"
         self.saved.append({"conduce": conduce, "escuela": code,
-                           "productos": [c for c, _ in self.lines]})
+                           "productos": [ln[0] for ln in self.lines],
+                           "cantidades": [ln[2] for ln in self.lines]})
         self.lines = []
         self.entry_desc = ""
         if not self.keeps_school_after_save:

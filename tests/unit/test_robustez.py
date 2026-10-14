@@ -117,3 +117,34 @@ class TestAbrirBusqueda(Base):
         self.engine.run(self.day, RunOptions())
         self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
         self.assertIn(("search", "{ESC}"), self.drv.keys_log)
+
+
+class TestEnterCantidad(Base):
+    """SisFaCon real: el producto queda en la fila azul hasta un Enter en Cantidad."""
+
+    def test_segundo_enter_automatico(self):
+        self.drv.needs_qty_enter = True
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+        self.assertEqual([s["productos"] for s in self.drv.saved], [["1000"]] * 3)
+
+    def test_descripcion_calibrada_en_fila_de_entrada(self):
+        self.drv.needs_qty_enter = True
+        self.drv.desc_region_on_entry_row = True    # tras añadir la línea queda vacía
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+
+    def test_producto_equivocado_no_recibe_enter_extra(self):
+        self.drv.needs_qty_enter = True
+        self.drv.inject("wrong_product_desc", "1000")
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states()[0], InvoiceStatus.ERROR)
+        self.assertEqual(self.drv.lines, [])        # no se añadió la línea equivocada
+        self.assertEqual(len(self.drv.saved), 0)
+
+    def test_producto_sobrante_en_fila_de_entrada(self):
+        self.drv.entry_desc = "PAN"          # quedó de un intento anterior
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states()[0], InvoiceStatus.ERROR)
+        self.assertIn("sin añadir", self.ctx.days.invoices(self.day)[0]["mensaje"])
+        self.assertEqual(len(self.drv.saved), 0)

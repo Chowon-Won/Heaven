@@ -90,7 +90,8 @@ class MiniPanel(QWidget):
         self._update_buttons()
 
     def _on_invoice(self, inv: dict) -> None:
-        self.school.setText(f"{inv.get('escuela_codigo', '')} — {inv.get('escuela_nombre', '')}")
+        self.school.setText(f"{inv.get('escuela_codigo', '')} — {inv.get('escuela_nombre', '')}"
+                            f" · cant. {inv.get('cantidad', '')}")
         if self.ctl.day_id:
             c = self.app.days.counts(self.ctl.day_id)
             self.progress.setMaximum(max(1, c["total"]))

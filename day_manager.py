@@ -67,6 +67,10 @@ class DayManager:
         """Crea la jornada copiando producto y escuelas (instantánea)."""
         if not schools:
             raise ValueError("Seleccione al menos una escuela.")
+        missing = [s["codigo"] for s in schools if int(s.get("cantidad") or 0) <= 0]
+        if missing:
+            raise ValueError("Estas escuelas no tienen cantidad: " + ", ".join(missing[:15]) +
+                             ". Póngala en la pestaña Escuelas (columna Cantidad).")
         codes = [s["codigo"] for s in schools]
         if len(set(codes)) != len(codes):
             raise ValueError("La lista contiene escuelas repetidas.")
@@ -83,9 +87,10 @@ class DayManager:
             for orden, s in enumerate(schools, start=1):
                 self.db._conn.execute(
                     "INSERT INTO facturas(jornada_id, orden, escuela_id, escuela_codigo, "
-                    "escuela_nombre, estado, estado_impresion, actualizado) "
-                    "VALUES(?,?,?,?,?,?,?,?)",
+                    "escuela_nombre, cantidad, estado, estado_impresion, actualizado) "
+                    "VALUES(?,?,?,?,?,?,?,?,?)",
                     (day_id, orden, s.get("id"), str(s["codigo"]), s["nombre"],
+                     int(s["cantidad"]),
                      InvoiceStatus.PENDIENTE, PrintStatus.PENDIENTE, ts))
         return day_id
 

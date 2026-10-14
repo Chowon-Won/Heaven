@@ -25,7 +25,8 @@ def make_ctx(n_schools: int = 3) -> AppContext:
     ctx = AppContext.create(db_path=":memory:")
     ctx.settings.update(FAST)
     for i in range(n_schools):
-        ctx.schools.add(codigo=f"0{2950 + i}", nombre=f"ESCUELA PRUEBA {i + 1}")
+        ctx.schools.add(codigo=f"0{2950 + i}", nombre=f"ESCUELA PRUEBA {i + 1}",
+                        cantidad=100 + 10 * i)
     return ctx
 
 

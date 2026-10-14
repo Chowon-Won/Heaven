@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS escuelas (
     activo      INTEGER NOT NULL DEFAULT 1,
     notas       TEXT NOT NULL DEFAULT '',
     orden       INTEGER NOT NULL DEFAULT 0,
+    cantidad    INTEGER NOT NULL DEFAULT 0,
     eliminado   INTEGER NOT NULL DEFAULT 0,
     creado      TEXT NOT NULL,
     actualizado TEXT NOT NULL
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS facturas (
     escuela_id             INTEGER,
     escuela_codigo         TEXT NOT NULL,
     escuela_nombre         TEXT NOT NULL,
+    cantidad               INTEGER NOT NULL DEFAULT 0,
     estado                 TEXT NOT NULL,
     estado_impresion       TEXT NOT NULL,
     etapa                  TEXT NOT NULL DEFAULT 'IDLE',
@@ -147,9 +149,12 @@ class Database:
 
     def _migrate(self) -> None:
         """Añade columnas nuevas a bases de datos creadas por versiones anteriores."""
-        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(escuelas)")}
-        if "orden" not in cols:
-            self._conn.execute("ALTER TABLE escuelas ADD COLUMN orden INTEGER NOT NULL DEFAULT 0")
+        for table, column in (("escuelas", "orden"), ("escuelas", "cantidad"),
+                              ("facturas", "cantidad")):
+            cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}
+            if column not in cols:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} "
+                                   "INTEGER NOT NULL DEFAULT 0")
 
     # ------------------------------------------------------------------
     def execute(self, sql: str, params: Iterable[Any] = ()) -> int:

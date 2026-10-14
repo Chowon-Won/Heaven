@@ -18,6 +18,11 @@ jornada seleccionada en «Automatización» con el modo elegido allí.
 * **Exportar** a CSV o Excel. **Guardar plantilla** crea un archivo de ejemplo.
 * Eliminar es un **borrado lógico**: el historial de facturas conserva el nombre y el código.
 
+**Cantidad (obligatoria):** cada escuela tiene una cantidad fija que el programa escribe en la
+columna Cantidad de SisFaCon. Póngala en el Excel (columna «Cantidad») y vuelva a importarlo
+respondiendo **Sí** a «¿ACTUALIZAR?», o edite la escuela. Una escuela sin cantidad no puede entrar
+en una jornada. La jornada guarda la cantidad del momento en que se crea.
+
 ### 3. Productos
 Igual que Escuelas. Campos:
 * **Nombre** (lo que ve usted), **Código en SisFaCon** (lo que se teclea, como texto),
@@ -88,7 +93,10 @@ acceso, recuperación…) y **Facturas**. **Exportar a CSV** exporta la vista ac
    * **CÓDIGO del centro** → la casilla CODIGO (ej. 02968). *Obligatorio.*
    * **Celda azul Código** → la celda azul de la columna Código; el clic se hace en la cruz del
      centro. *Obligatorio.*
-   * **Descripción (1.ª línea)** → la descripción en la primera línea de la tabla de abajo.
+   * **Descripción (fila azul)** → la columna Descripción de la fila azul de entrada (donde
+     aparece el nombre del producto al escribir su código).
+   * **Cantidad (1.ª línea)** → la cantidad de la primera línea de la tabla de abajo (opcional:
+     comprueba que la cantidad se escribió bien).
    * **«0 Linea(s)»** → el rótulo bajo la tabla.
    * **Último CONDUCE** → el texto «CONDUCE: FCR …» de ULTIMAS CONDUCE REGISTRADO.
    * **NOMBRE del centro** y **Botón Imprimir** → opcionales.

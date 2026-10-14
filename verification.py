@@ -123,3 +123,20 @@ def is_access_violation(title: str | None, text: str | None,
     has_module = mod in body or mod.replace(" ", "") in body.replace(" ", "")
     title_ok = (not head) or "SISFACON" in head.replace(" ", "")
     return has_av and has_module and title_ok
+
+
+def parse_quantity(text: str | None) -> int | None:
+    """Cantidad leída de la tabla (admite «304», «304.00», «3O4», «1,250»)."""
+    if not text:
+        return None
+    for part in str(text).split("|"):
+        t = part.strip().translate(_OCR_DIGIT_FIX)
+        m = re.search(r"\d[\d.,]*", t)
+        if not m:
+            continue
+        raw = m.group(0)
+        raw = re.sub(r"[.,]\d{1,2}$", "", raw)     # decimales .00
+        raw = raw.replace(",", "").replace(".", "")
+        if raw.isdigit():
+            return int(raw)
+    return None

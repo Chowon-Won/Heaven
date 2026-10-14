@@ -91,7 +91,7 @@ class DayTab(QWidget):
     def _build_schools(self):
         self.school_search = QLineEdit(placeholderText="Buscar escuela…")
         self.school_search.textChanged.connect(self._filter_schools)
-        self.schools_table = make_table(["", "Código", "Nombre"], multi=True)
+        self.schools_table = make_table(["", "Código", "Nombre", "Cantidad"], multi=True)
         self.schools_table.itemChanged.connect(lambda *_: self._update_count())
         self.count_label = QLabel()
         row = QHBoxLayout()
@@ -187,6 +187,12 @@ class DayTab(QWidget):
             return error(self, "Confirme el código del producto para continuar.")
         if idx == 3 and not self.checked_schools():
             return error(self, "Seleccione al menos una escuela.")
+        if idx == 3:
+            missing = self.app.schools.without_quantity(self.checked_schools())
+            if missing:
+                return error(self, "Estas escuelas no tienen cantidad (póngala en la pestaña "
+                                   "Escuelas o en el Excel e impórtelo):\n\n" + "\n".join(
+                                       f"{s['codigo']} — {s['nombre']}" for s in missing[:20]))
         if idx == len(STEPS) - 1:
             return self.create_day()
         self.go(idx + 1)
@@ -231,6 +237,7 @@ class DayTab(QWidget):
             t.setItem(r, 0, chk)
             t.setItem(r, 1, QTableWidgetItem(s["codigo"]))
             t.setItem(r, 2, QTableWidgetItem(s["nombre"]))
+            t.setItem(r, 3, QTableWidgetItem(str(s["cantidad"] or "FALTA")))
         t.blockSignals(False)
         t.resizeColumnsToContents()
         for combo, pick_last in ((self.range_from, False), (self.range_to, True)):
@@ -341,7 +348,8 @@ class DayTab(QWidget):
                 f"<b>Facturas previstas:</b> {len(schools)}")
         if not short:
             html += "<hr><b>Lista de escuelas:</b><ol>" + "".join(
-                f"<li>{s['codigo']} — {s['nombre']}</li>" for s in schools) + "</ol>"
+                f"<li>{s['codigo']} — {s['nombre']} — cantidad <b>{s['cantidad'] or 'FALTA'}</b></li>"
+                for s in schools) + "</ol>"
         return html
 
     def _fill_review(self):

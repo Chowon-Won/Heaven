@@ -118,7 +118,7 @@ class AutomationTab(QWidget):
 
         # --- estado
         self.state = QLabel("En espera", objectName="State")
-        self.table = make_table(["#", "Código", "Escuela", "Estado", "Impresión",
+        self.table = make_table(["#", "Código", "Escuela", "Cantidad", "Estado", "Impresión",
                                  "Intentos", "Etapa", "Mensaje"])
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._menu)
@@ -220,7 +220,7 @@ class AutomationTab(QWidget):
             return
         rows, ids, colors = [], [], []
         for f in self.app.days.invoices(day["id"]):
-            rows.append([f["orden"], f["escuela_codigo"], f["escuela_nombre"],
+            rows.append([f["orden"], f["escuela_codigo"], f["escuela_nombre"], f["cantidad"],
                          InvoiceStatus.LABELS.get(f["estado"], f["estado"]),
                          PrintStatus.LABELS.get(f["estado_impresion"], f["estado_impresion"]),
                          f["intentos_recuperacion"], f["etapa"], f["mensaje"]])

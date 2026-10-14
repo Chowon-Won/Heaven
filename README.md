@@ -16,7 +16,7 @@ de datos: maneja la aplicación igual que lo haría una persona, verificando cad
 |---|---|---|
 | 1 | Formulario «Registro de Conduce a Centro Educativo» listo | Ventana encontrada, sin diálogos abiertos, «0 Linea(s)» |
 | 2 | **F7** → «Seleccione un Cliente» → escribe el código en «Texto búsqueda» → **Enter** | El campo CODIGO muestra exactamente el código esperado (con ceros) |
-| 3 | Clic en la celda azul **Código** → escribe el código del producto → **Enter** | «1 Linea(s)» y la descripción coincide con el producto |
+| 3 | Clic en la celda azul **Código** → código del producto → **Enter** → aparece la descripción y queda seleccionada la Cantidad → escribe la **cantidad de la escuela** → **Enter** | La descripción coincide; «1 Linea(s)»; (opcional) la cantidad de la línea coincide |
 | 4 | **Ctrl+G** | Se abre la ventana **«Preview - [No name]»** (prueba de que se grabó) |
 | 5 | **F9** en la vista previa → diálogo **«Print»** → **OK** | El diálogo se cierra sin errores |
 | 6 | **Esc** cierra la vista previa | El número de «ULTIMAS CONDUCE REGISTRADO» cambió |

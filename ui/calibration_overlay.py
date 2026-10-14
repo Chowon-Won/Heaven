@@ -20,7 +20,8 @@ SHORT = {
     "codigo_centro": "CÓDIGO del centro", "nombre_centro": "NOMBRE del centro",
     "ultimo_conduce": "Último CONDUCE (FCR …)", "contador_lineas": "«0 Linea(s)»",
     "celda_codigo_producto": "Celda azul Código", "descripcion_producto":
-    "Descripción (1.ª línea)", "texto_busqueda": "Texto búsqueda",
+    "Descripción (fila azul)", "cantidad_linea": "Cantidad (1.ª línea)",
+    "texto_busqueda": "Texto búsqueda",
 }
 
 

@@ -103,6 +103,7 @@ class RecordDialog(QDialog):
 SCHOOL_FIELDS = [("orden", "Orden en la ruta (1, 2, 3…)", "text"),
                  ("codigo", "Código de escuela", "text"),
                  ("nombre", "Nombre completo", "text"),
+                 ("cantidad", "Cantidad que se factura (fija)", "text"),
                  ("activo", "Activa", "bool"),
                  ("notas", "Notas internas", "multiline")]
 
