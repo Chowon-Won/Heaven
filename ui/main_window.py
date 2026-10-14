@@ -11,6 +11,7 @@ from ui.controller import AutomationController
 from ui.dashboard_tab import DashboardTab
 from ui.day_tab import DayTab
 from ui.history_tab import HistoryTab
+from ui.mini_panel import MiniPanel
 from ui.settings_tab import SettingsTab
 
 
@@ -24,6 +25,9 @@ class MainWindow(QMainWindow):
         self.ctl.parent_widget = self
         self.ctl.notified.connect(self._notify)
         self.ctl.finished.connect(self._finished)
+        self.mini = MiniPanel(app_ctx, self.ctl, self._restore)
+        self.ctl.dialog_parent = lambda: self.mini if self.mini.isVisible() else self
+        self.ctl.running_changed.connect(self._on_running)
 
         self.tabs = QTabWidget()
         self.automation = AutomationTab(app_ctx, self.ctl)
@@ -63,7 +67,35 @@ class MainWindow(QMainWindow):
         self.automation.reload_days(day_id)
         self.tabs.setCurrentWidget(self.automation)
 
+    # ----------------------------------------------------- modo compacto
+    def _on_running(self, running: bool) -> None:
+        if running and self.ctl.mode != Mode.SIMULADO \
+                and self.app.settings["minimizar_al_ejecutar"]:
+            free = False
+            try:
+                free = self.mini.place()
+            except Exception:
+                free = False
+            if free:
+                self.mini._update_buttons()
+                self.mini.show()
+            else:
+                self.app.logger.log("INFO", "No hay una esquina libre para el panel pequeño: "
+                                    "use la barra de tareas o la esquina superior izquierda "
+                                    "(emergencia) para parar.", "AVISO")
+            self.showMinimized()
+        elif not running:
+            self._restore()
+
+    def _restore(self) -> None:
+        self.mini.hide()
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def _notify(self, level, title, message):
+        self._restore()
         (QMessageBox.critical if level == "ERROR" else QMessageBox.information)(self, title, message)
 
     def _finished(self, summary: str):

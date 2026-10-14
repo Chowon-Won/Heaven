@@ -3,8 +3,9 @@ que la interfaz siga respondiendo, y traduce sus avisos en señales Qt."""
 from __future__ import annotations
 
 import threading
+import time
 
-from PySide6.QtCore import QObject, Signal, Slot
+from PySide6.QtCore import QObject, Qt, Signal, Slot
 from PySide6.QtWidgets import QMessageBox
 
 from automation import AutomationEngine, EngineUI, FlowAbort, RunOptions
@@ -21,6 +22,8 @@ class _Bridge(EngineUI):
         box = {"answer": options[-1], "event": threading.Event()}
         self.ctl._ask_request.emit(title, message, options, box)
         box["event"].wait()
+        # Deja que Windows redibuje SisFaCon antes de leer la pantalla otra vez.
+        time.sleep(0.5)
         return box["answer"]
 
     def notify(self, level, title, message):
@@ -51,6 +54,8 @@ class AutomationController(QObject):
         self._ask_request.connect(self._on_ask)
         self.app.logger.listeners.append(lambda ev: self.event_logged.emit(dict(ev)))
         self.parent_widget = None
+        self.dialog_parent = None   # widget sobre el que se muestran las preguntas
+        self.mode: str | None = None
 
     @property
     def running(self) -> bool:
@@ -67,6 +72,7 @@ class AutomationController(QObject):
                                     "La automatización ya está en marcha.")
             return
         self.day_id = day_id
+        self.mode = options.mode
         self._thread = threading.Thread(target=self._run, args=(day_id, options), daemon=True)
         self._thread.start()
         self.running_changed.emit(True)
@@ -121,7 +127,10 @@ class AutomationController(QObject):
     # ------------------------------------------------------------- preguntas
     @Slot(str, str, list, object)
     def _on_ask(self, title, message, options, box):
-        mb = QMessageBox(self.parent_widget)
+        parent = self.dialog_parent() if callable(self.dialog_parent) else self.parent_widget
+        mb = QMessageBox(parent)
+        # Siempre visible aunque la ventana principal esté minimizada.
+        mb.setWindowFlags(mb.windowFlags() | Qt.WindowStaysOnTopHint)
         mb.setWindowTitle(title)
         mb.setText(message)
         mb.setIcon(QMessageBox.Question)

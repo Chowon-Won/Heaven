@@ -5,6 +5,7 @@ import os
 import sys
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox,
                                QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
                                QScrollArea, QSpinBox, QVBoxLayout, QWidget)
@@ -57,6 +58,7 @@ FIELDS = [
         ("ruta_tesseract", "Ruta de tesseract.exe (vacío = automática)", "text"),
         ("idioma_ocr", "Idioma OCR", "text"),
         ("capturas_en_error", "Guardar captura de pantalla en cada error", "bool"),
+        ("minimizar_al_ejecutar", "Al iniciar en modo real, minimizar y mostrar un panel pequeño", "bool"),
     ]),
 ]
 
@@ -183,6 +185,11 @@ class SettingsTab(QWidget):
         v.addWidget(self.cal_status)
         self._capture = None
         self._timer = QTimer(self, interval=1000, timeout=self._tick)
+        self._hint = QLabel(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+                            | Qt.WindowDoesNotAcceptFocus)
+        self._hint.setAttribute(Qt.WA_ShowWithoutActivating)
+        self._hint.setStyleSheet("background:#0f4c81; color:white; font-size:12pt; "
+                                 "font-weight:600; padding:10px; border-radius:6px;")
         return box
 
     def refresh_calibration(self):
@@ -224,6 +231,10 @@ class SettingsTab(QWidget):
             ["la esquina SUPERIOR IZQUIERDA", "la esquina INFERIOR DERECHA"]
         self._capture = {"name": name, "cal": cal, "steps": steps, "points": [], "count": 5}
         self.cal_btn.setEnabled(False)
+        # Se aparta la ventana para que SisFaCon quede a la vista; las instrucciones
+        # se muestran en un aviso pequeño que no tapa SisFaCon.
+        self.window().showMinimized()
+        self._hint.show()
         self._timer.start()
         self._tick()
 
@@ -233,8 +244,10 @@ class SettingsTab(QWidget):
             return
         step = c["steps"][len(c["points"])]
         if c["count"] > 0:
-            self.cal_status.setText(f"«{c['name']}»: coloque el ratón en {step}. "
-                                    f"Captura en {c['count']} s…")
+            text = (f"«{c['name']}»: coloque el ratón en {step}. "
+                    f"Captura en {c['count']} s…")
+            self.cal_status.setText(text)
+            self._show_hint(text)
             c["count"] -= 1
             return
         from calibration import cursor_position
@@ -245,6 +258,8 @@ class SettingsTab(QWidget):
         self._timer.stop()
         self.cal_btn.setEnabled(True)
         self._capture = None
+        self._hint.hide()
+        self._restore_window()
         try:
             if len(c["points"]) == 1:
                 entry = c["cal"].save_point(c["name"], c["points"][0])
@@ -259,11 +274,41 @@ class SettingsTab(QWidget):
         name = self._selected_field()
         if not name:
             return
-        try:
-            result = self._calibrator().test_read(name)
-        except Exception as exc:
-            result = f"Error: {exc}"
-        QMessageBox.information(self, f"Lectura de {name}", result)
+
+        def read():
+            try:
+                return self._calibrator().test_read(name)
+            except Exception as exc:
+                return f"Error: {exc}"
+
+        self._with_screen_free(read, lambda r: QMessageBox.information(
+            self, f"Lectura de {name}", r))
+
+    # --------------------------------------- dejar SisFaCon a la vista
+    def _show_hint(self, text: str) -> None:
+        self._hint.setText(text)
+        self._hint.adjustSize()
+        geo = QGuiApplication.primaryScreen().availableGeometry()
+        self._hint.move(geo.right() - self._hint.width() - 12,
+                        geo.bottom() - self._hint.height() - 12)
+
+    def _restore_window(self) -> None:
+        win = self.window()
+        win.showNormal()
+        win.raise_()
+        win.activateWindow()
+
+    def _with_screen_free(self, work, done) -> None:
+        """Minimiza la ventana, espera a que Windows redibuje SisFaCon, ejecuta
+        ``work`` (lee la pantalla) y vuelve a mostrar la ventana con el resultado."""
+        self.window().showMinimized()
+
+        def run():
+            result = work()
+            self._restore_window()
+            done(result)
+
+        QTimer.singleShot(800, run)
 
     def apply_method(self):
         name = self._selected_field()
@@ -346,22 +391,33 @@ class SettingsTab(QWidget):
             os.startfile(str(self.app.data_dir))
 
     def probe(self):
-        try:
-            from window_detection import RealDriver
-            from error_recovery import classify_window
-            drv = RealDriver(self.app.settings)
-            if not drv.find_main():
-                return error(self, "No se encontró la ventana «Registro de Conduce a Centro "
+        def work():
+            try:
+                from window_detection import RealDriver
+                from error_recovery import classify_window
+                drv = RealDriver(self.app.settings)
+                if not drv.find_main():
+                    return False, ("No se encontró la ventana «Registro de Conduce a Centro "
                                    "Educativo». Ábrala en SisFaCon.")
-            lines = [f"Ventana principal encontrada: {drv.window_rect('principal')}"]
-            for w in drv.capture_baseline():
-                lines.append(f"Ventana pendiente: {w.describe()} → {classify_window(w, self.app.settings).kind.value}")
-            for name in ("codigo_centro", "nombre_centro", "ultimo_conduce", "contador_lineas",
-                         "descripcion_producto"):
-                if drv.is_calibrated(name):
-                    lines.append(f"{name}: «{drv.read_field(name)}»")
-            lines.append("OCR disponible: " + ("sí" if drv.ocr.available() else
-                                               "no (instale Tesseract si algún campo lo necesita)"))
-            QMessageBox.information(self, "Conexión con SisFaCon", "\n".join(lines))
-        except Exception as exc:
-            error(self, f"No se pudo comprobar: {exc}")
+                lines = [f"Ventana principal encontrada: {drv.window_rect('principal')}"]
+                for w in drv.capture_baseline():
+                    lines.append(f"Ventana pendiente: {w.describe()} → "
+                                 f"{classify_window(w, self.app.settings).kind.value}")
+                for name in ("codigo_centro", "nombre_centro", "ultimo_conduce",
+                             "contador_lineas", "descripcion_producto"):
+                    if drv.is_calibrated(name):
+                        lines.append(f"{name}: «{drv.read_field(name)}»")
+                lines.append("OCR disponible: " + ("sí" if drv.ocr.available() else
+                                                   "no (instale Tesseract si algún campo lo necesita)"))
+                return True, "\n".join(lines)
+            except Exception as exc:
+                return False, f"No se pudo comprobar: {exc}"
+
+        def done(result):
+            ok, text = result
+            if ok:
+                QMessageBox.information(self, "Conexión con SisFaCon", text)
+            else:
+                error(self, text)
+
+        self._with_screen_free(work, done)

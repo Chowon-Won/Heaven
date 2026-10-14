@@ -108,6 +108,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # --- Seguridad -------------------------------------------------------
     "prueba_superada": False,
     "confirmar_cada_escuela": False,
+    # En modo real: minimizar la ventana principal al iniciar y mostrar un panel
+    # pequeño en una esquina que no tape las zonas calibradas de SisFaCon.
+    "minimizar_al_ejecutar": True,
     "capturas_en_error": True,
 
     # --- OCR -------------------------------------------------------------

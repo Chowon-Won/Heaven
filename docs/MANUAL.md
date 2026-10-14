@@ -90,6 +90,18 @@ acceso, recuperación…) y **Facturas**. **Exportar a CSV** exporta la vista ac
 Las posiciones se guardan **relativas a la ventana** y junto con su tamaño. Si la ventana cambia de
 tamaño, el macro se detiene y pide recalibrar o restaurar el tamaño: nunca hace clic «a ciegas».
 
+## Pantalla durante la automatización
+En modo Prueba o Automático la ventana del AutoFacturador **se minimiza sola** al iniciar, para que
+no tape SisFaCon (el OCR lee la pantalla y los clics deben caer en SisFaCon). En su lugar aparece un
+**panel pequeño** con el estado, la escuela, el progreso y los botones Pausar, Seguir, Detener y
+Ventana. El panel se coloca en una esquina que no tape ninguna zona calibrada; se puede arrastrar,
+pero no lo ponga encima de los campos de SisFaCon. Al terminar, detenerse o mostrar un error, la
+ventana vuelve a abrirse. Las preguntas («¿Grabar?», «¿Imprimir?») aparecen siempre encima.
+Se desactiva en Configuración: «Al iniciar en modo real, minimizar y mostrar un panel pequeño».
+
+La calibración, «Probar lectura» y «Probar conexión» también minimizan la ventana mientras leen la
+pantalla; durante la cuenta atrás de «Capturar» las instrucciones salen en un aviso abajo a la derecha.
+
 ## Estados de una factura
 
 | Estado | Significado |

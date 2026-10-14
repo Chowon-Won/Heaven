@@ -79,6 +79,45 @@ def escape_keys(text: str) -> str:
 DIALOG_CLASSES = ("#32770", "TMessageForm")
 
 
+def find_window_rect(title_part: str):
+    """(izq, arriba, der, abajo) en píxeles reales de la primera ventana visible
+    cuyo título contiene ``title_part``; None si no hay (o no es Windows)."""
+    if not sys.platform.startswith("win") or not title_part:
+        return None
+    try:
+        import win32gui
+    except ImportError:
+        return None
+    found = []
+
+    def cb(hwnd, _):
+        if win32gui.IsWindowVisible(hwnd) and not win32gui.IsIconic(hwnd) \
+                and title_part.lower() in win32gui.GetWindowText(hwnd).lower():
+            found.append(win32gui.GetWindowRect(hwnd))
+            return False
+        return True
+
+    try:
+        win32gui.EnumWindows(cb, None)
+    except Exception:  # EnumWindows lanza al detenerse desde el callback
+        pass
+    return found[0] if found else None
+
+
+def calibrated_screen_rects(settings, main_rect) -> list[tuple[int, int, int, int]]:
+    """Zonas de la ventana principal de SisFaCon que el macro lee o pulsa."""
+    if not main_rect:
+        return []
+    left, top = main_rect[0], main_rect[1]
+    out = []
+    for entry in (settings["calibracion"] or {}).values():
+        if entry.get("ventana") != "principal":
+            continue
+        x, y = left + entry["x"], top + entry["y"]
+        out.append((x - 10, y - 10, x + entry.get("w", 1) + 10, y + entry.get("h", 1) + 10))
+    return out
+
+
 def _ocr_accept():
     """Criterios para dar por buena una lectura OCR sin probar más variantes."""
     import re
