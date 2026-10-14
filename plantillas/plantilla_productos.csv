@@ -1,0 +1,3 @@
+codigo;nombre;texto_verificacion;activo;descripcion
+1000;Pan;;si;
+1005;Pan de zanahoria;;si;texto_verificacion = descripcion que muestra SisFaCon (vacio = nombre)

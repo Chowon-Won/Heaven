@@ -1,0 +1,7 @@
+venv/
+work/
+dist/
+descargas/
+redist/
+salida/
+*.spec
