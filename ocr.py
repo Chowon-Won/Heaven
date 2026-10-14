@@ -107,6 +107,8 @@ class OcrEngine:
             from PIL import ImageGrab, ImageOps
             import pytesseract
             x, y, w, h = rect
+            if w > 12 and h > 12:          # sin los bordes de la celda (dan «— | <<»)
+                x, y, w, h = x + 2, y + 2, w - 4, h - 4
             shot = ImageGrab.grab(bbox=(x, y, x + w, y + h), all_screens=True)
             gray = ImageOps.grayscale(shot)
             big = gray.resize((gray.width * 4, gray.height * 4))

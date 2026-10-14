@@ -62,3 +62,37 @@ class TestCantidad(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRuidoYJornadaAntigua(unittest.TestCase):
+    def setUp(self):
+        self.ctx = make_ctx(3)
+        self.day = make_day(self.ctx)
+        self.engine, self.drv, _ = make_engine(self.ctx)
+
+    def test_ruido_ocr_en_celda_vacia_no_es_un_producto(self):
+        self.drv.empty_cell_noise = "eC E E EE — ——— << << << << A AAA"
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual([i["estado"] for i in self.ctx.days.invoices(self.day)],
+                         [InvoiceStatus.COMPLETADA] * 3)
+
+    def test_producto_sobrante_real_si_se_detecta(self):
+        self.drv.entry_desc = "PAN"
+        self.engine.run(self.day, RunOptions())
+        self.assertIn("sin añadir", self.ctx.days.invoices(self.day)[0]["mensaje"])
+        self.assertEqual(len(self.drv.saved), 0)
+
+    def test_jornada_sin_cantidades_toma_las_de_la_escuela(self):
+        for inv in self.ctx.days.invoices(self.day):          # como una jornada antigua
+            self.ctx.days.update_invoice(inv["id"], cantidad=0)
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual([s["cantidades"] for s in self.drv.saved], [[100], [110], [120]])
+
+    def test_sin_cantidad_no_escribe_nada(self):
+        inv = self.ctx.days.invoices(self.day)[0]
+        self.ctx.days.update_invoice(inv["id"], cantidad=0)
+        self.ctx.schools.update(inv["escuela_id"], cantidad=0)
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.ctx.days.invoices(self.day)[0]["estado"], InvoiceStatus.ERROR)
+        self.assertEqual(self.drv.lines, [])
+        self.assertNotIn(("main", "1000"), self.drv.keys_log)

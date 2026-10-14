@@ -60,6 +60,7 @@ class SimulatedDriver(SisFaConDriver):
         self.no_match_selects_first = False  # Enter sin resultados elige la 1.ª fila
         self.keeps_school_after_save = False  # tras grabar no vuelve a <<CONTADO>>
         self.has_search_button = False    # «Buscar Centro» accesible como control
+        self.empty_cell_noise = ""        # lo que «lee» el OCR en una celda vacía
         self.needs_qty_enter = True       # como SisFaCon real: código+Enter, Cantidad+Enter
         self.desc_region_on_entry_row = True   # la descripción calibrada está en la fila azul
         self._qty_buffer = ""
@@ -245,7 +246,7 @@ class SimulatedDriver(SisFaConDriver):
                 return None if self.counter_unreadable else f"{len(self.lines)} Linea(s)"
             if name == "descripcion_producto":
                 if self.desc_region_on_entry_row:
-                    return self.entry_desc
+                    return self.entry_desc or self.empty_cell_noise
                 return self.lines[-1][1] if self.lines else ""
             if name == "cantidad_linea":
                 return str(self.lines[0][2]) if self.lines else ""

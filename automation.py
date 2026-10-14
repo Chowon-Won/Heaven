@@ -201,6 +201,10 @@ class AutomationEngine:
         reason = ""
         try:
             self._preflight()
+            filled = self.days.fill_missing_quantities(day_id)
+            if filled:
+                self.log.log("INFO", f"{filled} factura(s) sin cantidad toman la cantidad actual "
+                             "de su escuela.", jornada=day)
             items = self.days.pending_invoices(day_id)
             if options.invoice_ids is not None:
                 wanted = set(options.invoice_ids)
@@ -692,13 +696,31 @@ class AutomationEngine:
             if self._desc_on_entry_row() and ctx is not None and ctx.desc_seen:
                 # Ya se vio el producto correcto en la fila azul; al añadir la línea
                 # esa fila se vacía: vacía = línea añadida.
-                cleared = not normalize_text(desc)
+                cleared = not self._desc_matches(desc)
                 if not cleared:
                     detail.append("la fila de entrada aún tiene el producto")
                 good &= cleared
             else:
                 good &= self._desc_matches(desc)
         return good, ", ".join(detail)
+
+    def _looks_like_product(self, text: str | None) -> bool:
+        """¿El texto leído es la descripción de algún producto del catálogo?
+        (El OCR de una celda vacía devuelve ruido como «eC E EE — << A AAA».)"""
+        if not text:
+            return False
+        names = {self._day["producto_texto_verificacion"] or self._day["producto_nombre"]}
+        for p in self.products_catalog():
+            names.add(p.get("texto_verificacion") or p.get("nombre") or "")
+        thr = float(self.settings["umbral_similitud_producto"])
+        return any(n and text_matches(n, text, thr) for n in names)
+
+    def products_catalog(self) -> list[dict]:
+        try:
+            return self.days.db.query("SELECT nombre, texto_verificacion FROM productos "
+                                      "WHERE eliminado = 0")
+        except Exception:
+            return []
 
     def _desc_on_entry_row(self) -> bool:
         return bool(self.settings["descripcion_en_fila_entrada"])
@@ -727,12 +749,15 @@ class AutomationEngine:
                                 "Límpielo en SisFaCon antes de reintentar.", InvoiceStatus.ERROR)
         if self.settings["verificar_descripcion_producto"] and self._desc_on_entry_row():
             leftover = self._read("descripcion_producto")
-            if leftover and len(normalize_text(leftover)) >= 3:
+            if leftover and self._looks_like_product(leftover):
                 # Un producto escrito antes y sin añadir sigue en la fila azul de
                 # entrada: escribir encima daría «10051005». Mejor parar.
                 raise FlowAbort(f"La fila de entrada de SisFaCon ya tiene un producto sin añadir "
                                 f"(«{leftover}»). Pulse «Cancelar» en SisFaCon y vuelva a "
                                 "intentarlo. No se grabó nada.", InvoiceStatus.ERROR)
+        if int(ctx.inv.get("cantidad") or 0) <= 0:
+            raise FlowAbort("Esta escuela no tiene cantidad. Póngala en la pestaña Escuelas "
+                            "(o importe el Excel). No se escribió nada.", InvoiceStatus.ERROR)
         self._checkpoint(ctx)
         self._goto(State.ENTERING_PRODUCT, day["producto_codigo"])
         self._update(ctx)
@@ -745,9 +770,6 @@ class AutomationEngine:
         self._goto(State.VERIFYING_PRODUCT)
         self._update(ctx)
         qty = int(ctx.inv.get("cantidad") or 0)
-        if qty <= 0:
-            raise FlowAbort("Esta escuela no tiene cantidad. Póngala en la pestaña Escuelas.",
-                            InvoiceStatus.ERROR)
         if self.settings["verificar_descripcion_producto"] and self._desc_on_entry_row():
             # 1) SisFaCon reconoce el código: la descripción aparece en la fila de
             #    entrada y el cursor pasa a Cantidad (con el valor seleccionado).

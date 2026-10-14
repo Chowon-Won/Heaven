@@ -216,6 +216,18 @@ class DayManager:
                             guardado_intentado=0, intentos_recuperacion=0,
                             etapa="IDLE", mensaje="Restablecida manualmente a pendiente.")
 
+    def fill_missing_quantities(self, day_id: int) -> int:
+        """Facturas PENDIENTES con cantidad 0 (jornadas creadas antes de tener
+        cantidades) toman la cantidad actual de su escuela."""
+        rows = self.db.query(
+            "SELECT f.id, e.cantidad FROM facturas f JOIN escuelas e "
+            "ON e.codigo = f.escuela_codigo AND e.eliminado = 0 "
+            "WHERE f.jornada_id = ? AND f.estado = ? AND f.cantidad <= 0 AND e.cantidad > 0",
+            (day_id, InvoiceStatus.PENDIENTE))
+        for r in rows:
+            self.update_invoice(r["id"], cantidad=r["cantidad"])
+        return len(rows)
+
     def reset_errors(self, day_id: int) -> int:
         """Vuelve a PENDIENTE las facturas en ERROR (se sabe que no se grabaron:
         el error ocurrió antes de pulsar Ctrl+G). Las de REVISION no se tocan."""
