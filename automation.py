@@ -289,6 +289,8 @@ class AutomationEngine:
             needed.append("descripcion_producto")
         if s["verificar_nombre_escuela"]:
             needed.append("nombre_centro")
+        if s["verificar_cantidad_linea"]:
+            needed.append("cantidad_linea")
         missing = [n for n in needed if not self.driver.is_calibrated(n)]
         if missing:
             raise FlowAbort("Falta calibrar: " + ", ".join(missing) +
@@ -692,7 +694,8 @@ class AutomationEngine:
             detail.append(f"líneas={n if n is not None else 'ilegible'}")
             if n is not None or not self._counter_optional():
                 good &= n == expect_lines
-        if ctx is not None and self.driver.is_calibrated("cantidad_linea"):
+        if ctx is not None and s["verificar_cantidad_linea"] \
+                and self.driver.is_calibrated("cantidad_linea"):
             want = int(ctx.inv.get("cantidad") or 0)
             read = self._read("cantidad_linea")
             got = parse_quantity(read)

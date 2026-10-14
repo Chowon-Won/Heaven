@@ -22,6 +22,7 @@ class TestCantidad(unittest.TestCase):
                          [100, 110, 120])
 
     def test_cantidad_mal_escrita_no_se_graba(self):
+        self.ctx.settings.set("verificar_cantidad_linea", True)
         self.drv.inject("qty_ignored")
         self.engine.run(self.day, RunOptions())
         inv = self.ctx.days.invoices(self.day)[0]
@@ -110,3 +111,13 @@ class TestProductoParecido(unittest.TestCase):
         engine.run(day, RunOptions())
         self.assertEqual([i["estado"] for i in ctx.days.invoices(day)],
                          [InvoiceStatus.COMPLETADA] * 2)
+
+
+class TestVerificacionCantidadOpcional(unittest.TestCase):
+    def test_desactivada_no_bloquea_aunque_lea_otra_cosa(self):
+        ctx = make_ctx(1)
+        day = make_day(ctx)
+        engine, drv, _ = make_engine(ctx)
+        drv.read_field_override = {"cantidad_linea": "1"}     # recuadro mal colocado
+        engine.run(day, RunOptions())
+        self.assertEqual(ctx.days.invoices(day)[0]["estado"], InvoiceStatus.COMPLETADA)

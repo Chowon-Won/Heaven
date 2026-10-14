@@ -63,6 +63,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # (aparece al escribir el código y se vacía al añadir la línea).
     # False: está sobre la primera línea de la tabla inferior.
     "descripcion_en_fila_entrada": True,
+    # Comprobar la cantidad de la línea con el recuadro «cantidad_linea».
+    # Desactivado por defecto: actívelo solo si «Probar lectura» lee bien la cantidad.
+    "verificar_cantidad_linea": False,
 
     # --- Búsqueda de escuela ---------------------------------------------
     # "codigo" o "nombre": qué se escribe en «Texto búsqueda».

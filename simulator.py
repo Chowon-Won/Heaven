@@ -240,7 +240,11 @@ class SimulatedDriver(SisFaConDriver):
     def is_calibrated(self, name: str) -> bool:
         return True
 
+    read_field_override: dict = {}
+
     def read_field(self, name: str) -> str | None:
+        if name in self.read_field_override:
+            return self.read_field_override[name]
         with self._lock:
             if name == "codigo_centro":
                 return self.school[0]
