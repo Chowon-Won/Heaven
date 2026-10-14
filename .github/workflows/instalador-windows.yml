@@ -4,7 +4,7 @@ name: Instalador Windows
 on:
   workflow_dispatch:
   push:
-    tags: ["v*"]
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -26,9 +26,11 @@ jobs:
           name: SisFaConAutoFacturador_Setup
           path: build/salida/*.exe
       - name: Publicar descarga
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: SisFaCon AutoFacturador 1.0.${{ github.run_number }}
+          make_latest: true
           files: build/salida/*.exe
           body: |
             Instalador único de SisFaCon AutoFacturador para Windows 10/11 (64 bits).
