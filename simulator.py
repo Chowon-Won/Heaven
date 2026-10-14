@@ -59,6 +59,7 @@ class SimulatedDriver(SisFaConDriver):
         self.search_names_only = False    # la búsqueda solo filtra por nombre
         self.no_match_selects_first = False  # Enter sin resultados elige la 1.ª fila
         self.keeps_school_after_save = False  # tras grabar no vuelve a <<CONTADO>>
+        self.has_search_button = False    # «Buscar Centro» accesible como control
 
     # ------------------------------------------------------------ fallos
     def inject(self, event: str, code: str | None = None, times: int = 1, **kw) -> None:
@@ -139,6 +140,8 @@ class SimulatedDriver(SisFaConDriver):
             if kind == "main":
                 if self._modal_open():
                     return  # la ventana principal no responde con modales abiertos
+                if k == "{F7}" and self._fault("f7_ignored"):
+                    return
                 if k == "{F7}":
                     self._open("search", "Seleccione un Cliente", "Texto búsqueda")
                     self.windows[self.foreground]["search"] = ""
@@ -229,6 +232,17 @@ class SimulatedDriver(SisFaConDriver):
 
     def emergency_requested(self) -> bool:
         return self.emergency
+
+    def click_button(self, text: str) -> bool:
+        if not self.has_search_button or self._modal_open():
+            return False
+        self.keys_log.append(("main", f"[botón {text}]"))
+        self._open("search", "Seleccione un Cliente", "Texto búsqueda")
+        self.windows[self.foreground]["search"] = ""
+        return True
+
+    def input_hint(self) -> str:
+        return "(simulado)"
 
     def _check(self):
         if self.emergency:

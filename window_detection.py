@@ -66,6 +66,8 @@ class SisFaConDriver:
     def type_text(self, text: str) -> None: ...
     def screenshot(self, path: Path) -> bool: return False
     def emergency_requested(self) -> bool: return False
+    def click_button(self, text: str) -> bool: return False
+    def input_hint(self) -> str: return ""
 
 
 def escape_keys(text: str) -> str:
@@ -102,6 +104,47 @@ def find_window_rect(title_part: str):
     except Exception:  # EnumWindows lanza al detenerse desde el callback
         pass
     return found[0] if found else None
+
+
+def self_is_admin() -> bool | None:
+    """¿El AutoFacturador se está ejecutando como administrador?"""
+    if not sys.platform.startswith("win"):
+        return None
+    try:
+        import ctypes
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return None
+
+
+def process_is_elevated(pid: int) -> bool | None:
+    """¿El proceso indicado se ejecuta como administrador? None = no se pudo saber
+    (lo normal cuando el proceso es de administrador y nosotros no)."""
+    if not sys.platform.startswith("win") or not pid:
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32, adv = ctypes.windll.kernel32, ctypes.windll.advapi32
+        h = k32.OpenProcess(0x1000, False, int(pid))      # QUERY_LIMITED_INFORMATION
+        if not h:
+            return None
+        try:
+            token = wintypes.HANDLE()
+            if not adv.OpenProcessToken(h, 0x0008, ctypes.byref(token)):   # TOKEN_QUERY
+                return None
+            try:
+                elevated, size = wintypes.DWORD(), wintypes.DWORD()
+                if not adv.GetTokenInformation(token, 20, ctypes.byref(elevated), 4,
+                                               ctypes.byref(size)):           # TokenElevation
+                    return None
+                return bool(elevated.value)
+            finally:
+                k32.CloseHandle(token)
+        finally:
+            k32.CloseHandle(h)
+    except Exception:
+        return None
 
 
 def calibrated_screen_rects(settings, main_rect) -> list[tuple[int, int, int, int]]:
@@ -439,6 +482,49 @@ class RealDriver(SisFaConDriver):
             return True
         except Exception:
             return False
+
+    def click_button(self, text: str) -> bool:
+        """Pulsa un botón de la ventana principal por su texto (BM_CLICK).
+        Devuelve False si no existe como control de Windows."""
+        if not text:
+            return False
+        import win32con
+        import win32gui
+        self._check_emergency()
+        main = self._require_main()
+        wanted = text.replace("&", "").strip().lower()
+        found = []
+
+        def cb(hwnd, _):
+            try:
+                if win32gui.IsWindowVisible(hwnd) and win32gui.IsWindowEnabled(hwnd):
+                    label = self._desktop.window(handle=hwnd).window_text()
+                    if wanted in label.replace("&", "").strip().lower():
+                        found.append(hwnd)
+            except Exception:
+                pass
+            return True
+
+        try:
+            win32gui.EnumChildWindows(main.handle, cb, None)
+        except Exception:
+            return False
+        if not found:
+            return False
+        self.focus_window(main.handle)
+        win32gui.PostMessage(found[0], win32con.BM_CLICK, 0, 0)
+        return True
+
+    def input_hint(self) -> str:
+        """Explicación probable cuando SisFaCon no reacciona a las teclas."""
+        me = self_is_admin()
+        other = process_is_elevated(self._pid) if self._pid else None
+        if me is False and other is not False:
+            return ("SisFaCon parece ejecutarse como ADMINISTRADOR y el AutoFacturador no: Windows "
+                    "bloquea las teclas. Abra el AutoFacturador con clic derecho → «Ejecutar como "
+                    "administrador».")
+        return ("Compruebe que no haya otra ventana encima de SisFaCon y que F7 abra la búsqueda "
+                "cuando lo pulsa usted. Use Configuración → «Probar F7».")
 
     def emergency_requested(self) -> bool:
         try:

@@ -50,6 +50,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
 
     # --- Teclas (formato pywinauto: ^ = Ctrl, % = Alt, + = Mayús) -------
     "tecla_buscar_cliente": "{F7}",
+    # Botón de respaldo si F7 no abre la búsqueda (texto del botón en SisFaCon).
+    "boton_buscar_cliente": "Buscar Centro",
     "tecla_confirmar_busqueda": "{ENTER}",
     "tecla_grabar": "^g",
     # Teclas que se pulsan después de escribir el código del producto.

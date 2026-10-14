@@ -88,3 +88,32 @@ class TestReintentarErrores(Base):
         self.assertEqual(self.ctx.days.reset_errors(self.day), 1)
         estados = [i["estado"] for i in self.ctx.days.invoices(self.day)]
         self.assertEqual(estados[:2], [InvoiceStatus.PENDIENTE, InvoiceStatus.REVISION])
+
+
+class TestAbrirBusqueda(Base):
+    def test_f7_perdido_se_reintenta(self):
+        self.ctx.settings.set("timeout_ventana", 0.2)
+        self.drv.inject("f7_ignored")
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+        self.assertGreaterEqual(sum(1 for k in self.drv.keys_log if k == ("main", "{F7}")), 4)
+
+    def test_f7_perdido_usa_el_boton(self):
+        self.drv.has_search_button = True
+        self.drv.inject("f7_ignored")
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+        self.assertIn(("main", "[botón Buscar Centro]"), self.drv.keys_log)
+
+    def test_sisfacon_no_responde_nunca(self):
+        self.drv.inject("f7_ignored", times=-1)
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states()[0], InvoiceStatus.ERROR)
+        self.assertIn("no abrió", self.ctx.days.invoices(self.day)[0]["mensaje"])
+        self.assertEqual(len(self.drv.saved), 0)
+
+    def test_busqueda_olvidada_se_cierra_sola(self):
+        self.drv._open("search", "Seleccione un Cliente", "Texto búsqueda")
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+        self.assertIn(("search", "{ESC}"), self.drv.keys_log)

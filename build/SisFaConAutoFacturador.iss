@@ -52,7 +52,7 @@ Name: "{group}\Desinstalar {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExe}"; Description: "Abrir {#AppName}"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\{#AppExe}"; Description: "Abrir {#AppName}"; Flags: postinstall nowait skipifsilent shellexec
 
 ; Los datos del usuario (escuelas, productos, historial) están en
 ; %LOCALAPPDATA%\SisFaConAutoFacturador y NO se borran al desinstalar.

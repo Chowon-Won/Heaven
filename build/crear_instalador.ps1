@@ -73,7 +73,7 @@ Paso 4 'Empaquetando el programa (PyInstaller)'
 Push-Location $Root
 try {
     Ejecutar $VPy @('-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
-        '--name', 'SisFaConAutoFacturador',
+        '--name', 'SisFaConAutoFacturador', '--uac-admin',
         '--icon', "$Build\icono.ico",
         '--add-data', "$Root\plantillas;plantillas",
         '--collect-submodules', 'pywinauto',

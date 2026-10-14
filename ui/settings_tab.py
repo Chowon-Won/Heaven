@@ -395,11 +395,13 @@ class SettingsTab(QWidget):
         row = QHBoxLayout()
         probe = QPushButton("Probar conexión con SisFaCon")
         probe.clicked.connect(self.probe)
+        f7 = QPushButton("Probar F7 (abre y cierra la búsqueda)")
+        f7.clicked.connect(self.probe_f7)
         relock = QPushButton("Bloquear de nuevo el modo automático")
         relock.clicked.connect(self.relock)
         folder = QPushButton("Abrir carpeta de datos")
         folder.clicked.connect(self.open_folder)
-        for b in (probe, relock, folder):
+        for b in (probe, f7, relock, folder):
             row.addWidget(b)
         row.addStretch(1)
         v.addWidget(self.test_state)
@@ -443,6 +445,7 @@ class SettingsTab(QWidget):
                     if drv.is_calibrated(name):
                         lines.append(f"{name}: «{drv.read_field(name)}»")
                 lines.append(drv.ocr.status())
+                lines.append(_admin_line(drv))
                 return True, "\n".join(lines)
             except Exception as exc:
                 return False, f"No se pudo comprobar: {exc}"
@@ -455,3 +458,45 @@ class SettingsTab(QWidget):
                 error(self, text)
 
         self._with_screen_free(work, done)
+
+    def probe_f7(self):
+        """Pulsa F7 en SisFaCon, comprueba que se abre «Seleccione un Cliente» y la cierra."""
+        def work():
+            import time
+            try:
+                from error_recovery import WinKind, classify_window
+                from window_detection import RealDriver
+                drv = RealDriver(self.app.settings)
+                if not drv.find_main():
+                    return False, "No se encontró la ventana «Registro de Conduce a Centro Educativo»."
+                for w in drv.capture_baseline():
+                    if classify_window(w, self.app.settings).kind == WinKind.SEARCH:
+                        drv.send_keys("{ESC}", w.handle)
+                        time.sleep(1)
+                drv.send_keys(self.app.settings["tecla_buscar_cliente"])
+                for _ in range(24):
+                    time.sleep(0.25)
+                    for w in drv.list_windows():
+                        if classify_window(w, self.app.settings).kind == WinKind.SEARCH:
+                            drv.send_keys("{ESC}", w.handle)
+                            return True, ("F7 funciona: se abrió «Seleccione un Cliente» y se cerró "
+                                          "con Esc.\n" + _admin_line(drv))
+                return False, ("SisFaCon NO abrió «Seleccione un Cliente» con F7.\n"
+                               + drv.input_hint() + "\n" + _admin_line(drv))
+            except Exception as exc:
+                return False, f"No se pudo probar: {exc}"
+
+        def done(result):
+            ok, text = result
+            (QMessageBox.information if ok else QMessageBox.warning)(self, "Probar F7", text)
+
+        self._with_screen_free(work, done)
+
+
+def _admin_line(drv) -> str:
+    from window_detection import process_is_elevated, self_is_admin
+    me = self_is_admin()
+    other = process_is_elevated(drv._pid) if getattr(drv, "_pid", None) else None
+    txt = {True: "sí", False: "no", None: "no se pudo saber (probablemente sí)"}
+    return (f"AutoFacturador como administrador: {txt[me]} · "
+            f"SisFaCon como administrador: {txt[other]}")

@@ -292,7 +292,10 @@ class AutomationEngine:
         pending = self.driver.capture_baseline()
         for w in pending:
             c = classify_window(w, s)
-            if c.kind != WinKind.ACCESS_VIOLATION:
+            if c.kind == WinKind.SEARCH:
+                # Una búsqueda que quedó abierta se cierra con Esc (no elige nada).
+                self._close_search(w, None)
+            elif c.kind != WinKind.ACCESS_VIOLATION:
                 raise FlowAbort(f"Cierre primero esta ventana de SisFaCon: {w.describe()}")
         # Una violación de acceso pendiente se atiende en la primera factura.
 
@@ -516,7 +519,8 @@ class AutomationEngine:
         if not self.driver.find_main():
             raise FlowAbort("SisFaCon Express no está abierto.", InvoiceStatus.PENDIENTE)
         try:
-            self._scan(ctx, set())
+            for c in self._scan(ctx, {WinKind.SEARCH}):
+                self._close_search(c.win, ctx)
         except UnknownWindowDetected as exc:
             raise FlowAbort(f"Hay una ventana abierta en SisFaCon: {exc.win.describe()}",
                             InvoiceStatus.PENDIENTE)
@@ -583,13 +587,48 @@ class AutomationEngine:
                                 f"«{inv['escuela_nombre']}».", InvoiceStatus.ERROR)
         self.log.log("ESCUELA_SELECCIONADA", jornada=self._day, factura=inv)
 
+    def _close_search(self, win: WinInfo, ctx: InvoiceContext | None) -> None:
+        """Cierra con Esc una «Seleccione un Cliente» abierta (no selecciona nada)."""
+        self.log.log("INFO", "Había una «Seleccione un Cliente» abierta: se cierra con Esc.",
+                     jornada=self._day, factura=ctx.inv if ctx else None)
+        self.driver.send_keys("{ESC}", win.handle)
+        end = time.monotonic() + self._t("timeout_ventana")
+        while self.driver.window_exists(win.handle):
+            if time.monotonic() > end:
+                raise FlowAbort("No se pudo cerrar la ventana «Seleccione un Cliente» que estaba "
+                                "abierta. Ciérrela a mano.", InvoiceStatus.PENDIENTE)
+            self._sleep(self._poll())
+
+    def _open_search(self, ctx: InvoiceContext) -> Classified:
+        """F7 y, si SisFaCon no responde, botón «Buscar Centro» o un segundo F7."""
+        total = self._t("timeout_ventana")
+        first = min(total, 4.0)
+        self.driver.send_keys(self.settings["tecla_buscar_cliente"])
+        try:
+            return self._wait(ctx, "abrir «Seleccione un Cliente»", self._first(WinKind.SEARCH),
+                              {WinKind.SEARCH}, first)
+        except Timeout:
+            pass
+        if self.driver.click_button(self.settings["boton_buscar_cliente"]):
+            how = "el botón «Buscar Centro»"
+        else:
+            self.driver.send_keys(self.settings["tecla_buscar_cliente"])
+            how = "un segundo F7"
+        self.log.log("INFO", f"F7 no abrió la búsqueda; se reintenta con {how}.", "AVISO",
+                     jornada=self._day, factura=ctx.inv)
+        try:
+            return self._wait(ctx, "abrir «Seleccione un Cliente»", self._first(WinKind.SEARCH),
+                              {WinKind.SEARCH}, max(total - first, 4.0))
+        except Timeout:
+            raise FlowAbort("SisFaCon no abrió «Seleccione un Cliente» con F7 ni con " + how + ". "
+                            + self.driver.input_hint() + " No se grabó nada.",
+                            InvoiceStatus.ERROR)
+
     def _search_school(self, ctx: InvoiceContext, text: str) -> tuple[bool, str | None]:
         """Un intento de búsqueda. Devuelve (se cerró la búsqueda, código leído)."""
         self._goto(State.SELECTING_SCHOOL, text)
         self._update(ctx)
-        self.driver.send_keys(self.settings["tecla_buscar_cliente"])
-        search = self._wait(ctx, "abrir «Seleccione un Cliente»", self._first(WinKind.SEARCH),
-                            {WinKind.SEARCH}, self._t("timeout_ventana"))
+        search = self._open_search(ctx)
         self.driver.type_search_text(search.win.handle, text)
         self._sleep(self._t("espera_tras_tecla"))
         self._scan(ctx, {WinKind.SEARCH})
