@@ -70,22 +70,32 @@ acceso, recuperación…) y **Facturas**. **Exportar a CSV** exporta la vista ac
 * **Diagnóstico**: *Probar conexión con SisFaCon* (lee los campos calibrados sin pulsar nada),
   *Bloquear de nuevo el modo automático*, *Abrir carpeta de datos*.
 
-## Calibración
+## Calibración (con celdas arrastrables)
 
 1. Abra SisFaCon → «Registro de Conduce a Centro Educativo». Déjela **siempre del mismo tamaño**
    (lo más sencillo: maximizada).
-2. Seleccione a mano una escuela (F7) e introduzca a mano el código de un producto, sin grabar, para
-   que los campos tengan texto. Use después «Cancelar» en SisFaCon.
-3. En Configuración → Calibración, elija un campo y pulse **Capturar**:
-   * Campos de tipo *región* (código del centro, nombre, último conduce, «Linea(s)», descripción):
-     coloque el ratón en la esquina **superior izquierda** del texto y espere la cuenta; luego en la
-     esquina **inferior derecha**.
-   * Campos de tipo *punto* (celda Código): coloque el ratón en el centro de la celda azul.
-4. Pulse **Probar lectura**. Si el «Control de Windows» devuelve el texto correcto, no hace falta OCR.
-   Si no, instale Tesseract y compruebe que el OCR lo lee bien. Puede forzar el método (auto,
-   control, ocr).
-5. Obligatorios: `codigo_centro`, `celda_codigo_producto`, y los que pidan las verificaciones activas
-   (`contador_lineas`, `descripcion_producto`, `ultimo_conduce`).
+2. Seleccione a mano una escuela (F7) e introduzca a mano el código de un producto, **sin grabar**,
+   para que los campos tengan texto. Al terminar use «Cancelar» en SisFaCon.
+3. En Configuración pulse **«Calibrar con celdas (pantalla de conduce)»**. El AutoFacturador se
+   minimiza y sobre SisFaCon aparece una capa con un **recuadro de color por campo**:
+   * **Arrastre** cada recuadro (clic dentro) encima de su campo.
+   * **Estírelo** desde la esquina inferior derecha para que cubra solo el texto del campo.
+   * Flechas: mover 1 píxel · Mayús + flechas: cambiar tamaño · Tab: siguiente recuadro.
+   * Clic derecho: quitar un campo que no use.
+   * **Probar lectura** (en la barra) lee el recuadro seleccionado sin salir.
+   * **Guardar** (o Enter). **Cancelar** (o Esc) no cambia nada.
+4. Qué cubrir con cada recuadro:
+   * **CÓDIGO del centro** → la casilla CODIGO (ej. 02968). *Obligatorio.*
+   * **Celda azul Código** → la celda azul de la columna Código; el clic se hace en la cruz del
+     centro. *Obligatorio.*
+   * **Descripción (1.ª línea)** → la descripción en la primera línea de la tabla de abajo.
+   * **«0 Linea(s)»** → el rótulo bajo la tabla.
+   * **Último CONDUCE** → el texto «CONDUCE: FCR …» de ULTIMAS CONDUCE REGISTRADO.
+   * **NOMBRE del centro** y **Botón Imprimir** → opcionales.
+5. «Texto búsqueda» casi nunca hace falta (se detecta solo). Si se necesitara: pulse F7 en
+   SisFaCon y luego **«Calibrar Texto búsqueda (con F7 abierto)»**.
+
+La opción antigua **«Capturar con el ratón»** sigue disponible para un campo suelto.
 
 Las posiciones se guardan **relativas a la ventana** y junto con su tamaño. Si la ventana cambia de
 tamaño, el macro se detiene y pide recalibrar o restaurar el tamaño: nunca hace clic «a ciegas».

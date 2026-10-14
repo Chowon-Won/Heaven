@@ -159,14 +159,23 @@ class SettingsTab(QWidget):
         v = QVBoxLayout(box)
         v.addWidget(QLabel(
             "Abra SisFaCon en «Registro de Conduce a Centro Educativo» con el MISMO tamaño de ventana "
-            "que usará siempre (por ejemplo, maximizada). Pulse «Capturar», coloque el ratón donde se "
-            "indica y espere la cuenta atrás. Para regiones se capturan dos esquinas.\n"
-            "Recomendado: primero seleccione una escuela e introduzca un producto a mano para que los "
-            "campos tengan texto, y luego pulse «Probar lectura».", objectName="Hint"))
+            "que usará siempre (por ejemplo, maximizada). Recomendado: seleccione antes una escuela "
+            "e introduzca un producto a mano (sin grabar) para que los campos tengan texto.\n"
+            "Pulse «Calibrar con celdas»: sobre SisFaCon aparecen recuadros de colores; arrástrelos "
+            "encima de cada campo, estírelos desde la esquina y pulse Guardar.", objectName="Hint"))
+        cells = QHBoxLayout()
+        drag_main = QPushButton("Calibrar con celdas (pantalla de conduce)", objectName="Primary")
+        drag_main.clicked.connect(lambda: self.open_cells("principal"))
+        drag_search = QPushButton("Calibrar «Texto búsqueda» (con F7 abierto)")
+        drag_search.clicked.connect(lambda: self.open_cells("busqueda"))
+        cells.addWidget(drag_main)
+        cells.addWidget(drag_search)
+        cells.addStretch(1)
+        v.addLayout(cells)
         self.cal_table = make_table(["Campo", "Descripción", "Estado", "Método"], multi=False)
         v.addWidget(self.cal_table)
         row = QHBoxLayout()
-        self.cal_btn = QPushButton("Capturar", objectName="Primary")
+        self.cal_btn = QPushButton("Capturar con el ratón")
         self.cal_btn.clicked.connect(self.start_capture)
         test = QPushButton("Probar lectura")
         test.clicked.connect(self.test_field)
@@ -283,6 +292,32 @@ class SettingsTab(QWidget):
 
         self._with_screen_free(read, lambda r: QMessageBox.information(
             self, f"Lectura de {name}", r))
+
+    def open_cells(self, ventana: str) -> None:
+        """Calibración con celdas arrastrables sobre la ventana de SisFaCon."""
+        if not sys.platform.startswith("win"):
+            return error(self, "La calibración solo funciona en Windows con SisFaCon abierto.")
+        if self.ctl.running:
+            return error(self, "Detenga la automatización antes de calibrar.")
+        self.window().showMinimized()
+
+        def show():
+            from ui.calibration_overlay import open_overlay
+            try:
+                self._overlay = open_overlay(self.app, ventana)
+            except Exception as exc:
+                self._restore_window()
+                return error(self, str(exc))
+            self._overlay.saved.connect(self._cells_saved)
+            self._overlay.closed.connect(self._restore_window)
+            self._overlay.show()
+            self._overlay.raise_()
+
+        QTimer.singleShot(700, show)
+
+    def _cells_saved(self, message: str) -> None:
+        self.cal_status.setText(message + " Use «Probar lectura» para comprobar cada campo.")
+        self.refresh_calibration()
 
     # --------------------------------------- dejar SisFaCon a la vista
     def _show_hint(self, text: str) -> None:

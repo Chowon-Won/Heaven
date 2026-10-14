@@ -84,3 +84,65 @@ class Calibrator:
                          "OCR: (sin resultado — ¿Tesseract instalado?)")
         parts.append(f"Lectura usada por el macro: «{self.driver.read_field(field_name)}»")
         return "\n".join(parts)
+
+
+# ----------------------------------------------------------------------------
+# Calibración con celdas arrastrables: conversión entre recuadros en pantalla
+# (coordenadas lógicas de Qt, relativas a la ventana de SisFaCon) y entradas
+# de calibración (píxeles reales, relativos a la misma ventana).
+# ----------------------------------------------------------------------------
+DEFAULT_SIZES = {"region": (170, 26), "punto": (40, 22)}
+
+
+def fields_for_window(ventana: str) -> list[str]:
+    return [name for name, meta in CALIBRATION_FIELDS.items() if meta["ventana"] == ventana]
+
+
+def entries_to_boxes(cal: dict, ventana: str, ratio: float) -> dict[str, tuple[int, int, int, int]]:
+    """Recuadros iniciales (x, y, w, h lógicos). Usa la calibración guardada o,
+    si un campo no está calibrado, una posición escalonada para arrastrarlo."""
+    ratio = ratio or 1.0
+    boxes = {}
+    pending = 0
+    for name in fields_for_window(ventana):
+        entry = (cal or {}).get(name)
+        if entry:
+            x, y = entry["x"], entry["y"]
+            w, h = entry.get("w", 1), entry.get("h", 1)
+            if entry.get("tipo") == "punto" and w < 20:   # puntos antiguos de 6x6
+                cx, cy = x + w / 2, y + h / 2
+                dw, dh = DEFAULT_SIZES["punto"]
+                x, y, w, h = cx - dw * ratio / 2, cy - dh * ratio / 2, dw * ratio, dh * ratio
+            w, h = max(w, 8), max(h, 8)
+            boxes[name] = (round(x / ratio), round(y / ratio), round(w / ratio), round(h / ratio))
+        else:
+            dw, dh = DEFAULT_SIZES[CALIBRATION_FIELDS[name]["tipo"]]
+            boxes[name] = (40 + 30 * pending, 120 + 44 * pending, dw, dh)
+            pending += 1
+    return boxes
+
+
+def boxes_to_entries(boxes: dict, cal: dict, ventana: str, ratio: float,
+                     window_size: tuple[int, int], removed: set[str] = frozenset()) -> dict:
+    """Nueva calibración completa a partir de los recuadros colocados."""
+    ratio = ratio or 1.0
+    out = dict(cal or {})
+    win_w, win_h = window_size
+    for name in fields_for_window(ventana):
+        if name in removed:
+            out.pop(name, None)
+            continue
+        if name not in boxes:
+            continue
+        x, y, w, h = boxes[name]
+        px, py = round(x * ratio), round(y * ratio)
+        pw, ph = max(2, round(w * ratio)), max(2, round(h * ratio))
+        # Se recorta a la ventana: un recuadro fuera de SisFaCon no sirve.
+        px, py = max(0, min(px, win_w - 2)), max(0, min(py, win_h - 2))
+        pw, ph = min(pw, win_w - px), min(ph, win_h - py)
+        meta = CALIBRATION_FIELDS[name]
+        out[name] = {"ventana": meta["ventana"], "tipo": meta["tipo"],
+                     "x": px, "y": py, "w": pw, "h": ph,
+                     "metodo": (out.get(name) or {}).get("metodo", "auto"),
+                     "ancho_ventana": win_w, "alto_ventana": win_h}
+    return out
