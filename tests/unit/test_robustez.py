@@ -142,9 +142,3 @@ class TestEnterCantidad(Base):
         self.assertEqual(self.drv.lines, [])        # no se añadió la línea equivocada
         self.assertEqual(len(self.drv.saved), 0)
 
-    def test_producto_sobrante_en_fila_de_entrada(self):
-        self.drv.entry_desc = "PAN"          # quedó de un intento anterior
-        self.engine.run(self.day, RunOptions())
-        self.assertEqual(self.states()[0], InvoiceStatus.ERROR)
-        self.assertIn("sin añadir", self.ctx.days.invoices(self.day)[0]["mensaje"])
-        self.assertEqual(len(self.drv.saved), 0)

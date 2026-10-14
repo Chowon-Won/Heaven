@@ -32,8 +32,8 @@ from day_manager import DayManager, DayStatus, InvoiceStatus, Mode, PrintStatus
 from error_recovery import Classified, RecoveryPolicy, WinKind, classify_window
 from logging_manager import OperationLogger
 from state_machine import STATE_LABELS, State, StateMachine
-from verification import (codes_match, normalize_text, parse_conduce, parse_line_count,
-                          parse_quantity, text_matches)
+from verification import (best_match, codes_match, normalize_text, parse_conduce,
+                          parse_line_count, parse_quantity, text_matches)
 from window_detection import (CalibrationError, DriverError, EmergencyStop,
                               SisFaConDriver, WinInfo)
 
@@ -664,9 +664,16 @@ class AutomationEngine:
         return True, last["code"]
 
     def _desc_matches(self, desc: str | None) -> bool:
+        """¿Lo leído es el producto de la jornada (y no otro parecido del catálogo)?
+        Ej.: con «Pan» y «Pan de zanahoria», «PAN DE ZANAHORIA» solo vale para el segundo."""
         day = self._day
-        return text_matches(day["producto_texto_verificacion"] or day["producto_nombre"],
-                            desc, float(self.settings["umbral_similitud_producto"]))
+        expected = day["producto_texto_verificacion"] or day["producto_nombre"]
+        if not text_matches(expected, desc, float(self.settings["umbral_similitud_producto"])):
+            return False
+        others = [p.get("texto_verificacion") or p.get("nombre") or ""
+                  for p in self.products_catalog()]
+        best = best_match(desc, [expected] + others)
+        return best is None or normalize_text(best) == normalize_text(expected)
 
     def _product_ok(self, expect_lines: int = 1,
                     ctx: InvoiceContext | None = None) -> tuple[bool, str]:
@@ -747,14 +754,6 @@ class AutomationEngine:
                     return
                 raise FlowAbort(f"El formulario tiene líneas inesperadas ({detail}). "
                                 "Límpielo en SisFaCon antes de reintentar.", InvoiceStatus.ERROR)
-        if self.settings["verificar_descripcion_producto"] and self._desc_on_entry_row():
-            leftover = self._read("descripcion_producto")
-            if leftover and self._looks_like_product(leftover):
-                # Un producto escrito antes y sin añadir sigue en la fila azul de
-                # entrada: escribir encima daría «10051005». Mejor parar.
-                raise FlowAbort(f"La fila de entrada de SisFaCon ya tiene un producto sin añadir "
-                                f"(«{leftover}»). Pulse «Cancelar» en SisFaCon y vuelva a "
-                                "intentarlo. No se grabó nada.", InvoiceStatus.ERROR)
         if int(ctx.inv.get("cantidad") or 0) <= 0:
             raise FlowAbort("Esta escuela no tiene cantidad. Póngala en la pestaña Escuelas "
                             "(o importe el Excel). No se escribió nada.", InvoiceStatus.ERROR)

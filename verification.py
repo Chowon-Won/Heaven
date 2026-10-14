@@ -68,12 +68,39 @@ def text_matches(expected: str, read: str | None, threshold: float = 0.8) -> boo
     ne, nr = normalize_text(expected), normalize_text(read)
     if not ne:
         return False
-    if ne == nr or (len(ne) >= 3 and ne in nr):
+    if ne == nr:
+        return True
+    if len(nr) < 3:          # «AN», «E»…: ruido del OCR, nunca un nombre
+        return False
+    # El nombre completo aparece como palabras enteras («PAN» en «PAN SOBADO 50G»).
+    if len(ne) >= 3 and re.search(rf"(^| ){re.escape(ne)}( |$)", nr):
         return True
     # Las columnas estrechas pueden recortar la descripción.
     if len(nr) >= 6 and ne.startswith(nr):
         return True
+    if min(len(ne), len(nr)) / max(len(ne), len(nr)) < 0.6:
+        return False
     return similarity(ne, nr) >= threshold
+
+
+def best_match(read: str | None, candidates: list[str]) -> str | None:
+    """De varios nombres, el que mejor encaja con lo leído (o None)."""
+    if not read:
+        return None
+    parts = [p for p in str(read).split("|") if p.strip()] or [str(read)]
+    best, best_score = None, -1.0
+    for cand in candidates:
+        if not cand:
+            continue
+        nc = normalize_text(cand)
+        for part in parts:
+            if not text_matches(cand, part):
+                continue
+            np_ = normalize_text(part)
+            score = 2.0 if nc == np_ else similarity(nc, np_)
+            if score > best_score:
+                best, best_score = cand, score
+    return best
 
 
 def parse_line_count(text: str | None) -> int | None:

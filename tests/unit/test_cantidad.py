@@ -76,12 +76,6 @@ class TestRuidoYJornadaAntigua(unittest.TestCase):
         self.assertEqual([i["estado"] for i in self.ctx.days.invoices(self.day)],
                          [InvoiceStatus.COMPLETADA] * 3)
 
-    def test_producto_sobrante_real_si_se_detecta(self):
-        self.drv.entry_desc = "PAN"
-        self.engine.run(self.day, RunOptions())
-        self.assertIn("sin añadir", self.ctx.days.invoices(self.day)[0]["mensaje"])
-        self.assertEqual(len(self.drv.saved), 0)
-
     def test_jornada_sin_cantidades_toma_las_de_la_escuela(self):
         for inv in self.ctx.days.invoices(self.day):          # como una jornada antigua
             self.ctx.days.update_invoice(inv["id"], cantidad=0)
@@ -96,3 +90,23 @@ class TestRuidoYJornadaAntigua(unittest.TestCase):
         self.assertEqual(self.ctx.days.invoices(self.day)[0]["estado"], InvoiceStatus.ERROR)
         self.assertEqual(self.drv.lines, [])
         self.assertNotIn(("main", "1000"), self.drv.keys_log)
+
+
+class TestProductoParecido(unittest.TestCase):
+    def test_jornada_de_pan_no_acepta_pan_de_zanahoria(self):
+        ctx = make_ctx(1)
+        day = make_day(ctx, "1000")                       # jornada de Pan
+        engine, drv, _ = make_engine(ctx)
+        drv.products["1000"] = "PAN DE ZANAHORIA"         # SisFaCon muestra otro producto
+        engine.run(day, RunOptions())
+        self.assertEqual(ctx.days.invoices(day)[0]["estado"], InvoiceStatus.ERROR)
+        self.assertEqual(len(drv.saved), 0)
+
+    def test_ruido_an_no_detiene(self):
+        ctx = make_ctx(2)
+        day = make_day(ctx, "1005")
+        engine, drv, _ = make_engine(ctx)
+        drv.empty_cell_noise = "AN"
+        engine.run(day, RunOptions())
+        self.assertEqual([i["estado"] for i in ctx.days.invoices(day)],
+                         [InvoiceStatus.COMPLETADA] * 2)

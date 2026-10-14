@@ -78,3 +78,17 @@ class TestComparaciones(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestProductosParecidos(unittest.TestCase):
+    def test_ruido_corto_no_es_producto(self):
+        self.assertFalse(text_matches("Pan", "AN"))
+        self.assertFalse(text_matches("Pan", "E | AN | EE"))
+        self.assertFalse(text_matches("Pan de zanahoria", "AN"))
+
+    def test_pan_no_es_pan_de_zanahoria(self):
+        from verification import best_match
+        names = ["Pan", "Pan de zanahoria"]
+        self.assertEqual(best_match("PAN DE ZANAHORIA", names), "Pan de zanahoria")
+        self.assertEqual(best_match("PAN", names), "Pan")
+        self.assertEqual(best_match("PAN DE ZANAHORI", names), "Pan de zanahoria")
