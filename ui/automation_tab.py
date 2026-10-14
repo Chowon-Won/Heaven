@@ -89,6 +89,12 @@ class AutomationTab(QWidget):
         run_group.clicked.connect(self.run_group)
         self.controls = ControlButtons(self.run_all, ctl)
         self.controls.start.setText("▶ Ejecutar todas las seleccionadas")
+        self.range_from = QComboBox()
+        self.range_to = QComboBox()
+        for combo in (self.range_from, self.range_to):
+            combo.setMinimumWidth(220)
+        run_range = QPushButton("Ejecutar rango")
+        run_range.clicked.connect(self.run_range)
         run_box = QGroupBox("Ejecución")
         rv = QVBoxLayout(run_box)
         r1 = QHBoxLayout()
@@ -98,6 +104,13 @@ class AutomationTab(QWidget):
         r1.addWidget(self.group_n)
         r1.addStretch(1)
         rv.addLayout(r1)
+        r2 = QHBoxLayout()
+        r2.addWidget(QLabel("Desde la escuela"))
+        r2.addWidget(self.range_from, 1)
+        r2.addWidget(QLabel("hasta"))
+        r2.addWidget(self.range_to, 1)
+        r2.addWidget(run_range)
+        rv.addLayout(r2)
         rv.addWidget(self.confirm_each)
         rv.addWidget(self.controls)
         rv.addWidget(QLabel("Emergencia: lleve el ratón a la esquina SUPERIOR IZQUIERDA de la "
@@ -183,7 +196,21 @@ class AutomationTab(QWidget):
                                     "correcta en modo Prueba."))
         if day:
             self.day_selected.emit(day["id"])
+        self._fill_range(day)
         self.refresh_invoices()
+
+    def _fill_range(self, day: dict | None):
+        """Rellena los selectores «desde / hasta» con las escuelas de la jornada."""
+        invs = self.app.days.invoices(day["id"]) if day else []
+        for combo, pick_last in ((self.range_from, False), (self.range_to, True)):
+            combo.blockSignals(True)
+            combo.clear()
+            for f in invs:
+                combo.addItem(f"#{f['orden']}  {f['escuela_codigo']} — {f['escuela_nombre']}",
+                              f["orden"])
+            if invs:
+                combo.setCurrentIndex(len(invs) - 1 if pick_last else 0)
+            combo.blockSignals(False)
 
     def refresh_invoices(self):
         day = self.current_day()
@@ -236,6 +263,25 @@ class AutomationTab(QWidget):
 
     def run_group(self):
         self._start(limit=self.group_n.value())
+
+    def run_range(self):
+        day = self.current_day()
+        if not day or self.range_from.count() == 0:
+            return error(self, "La jornada no tiene escuelas.")
+        desde, hasta = self.range_from.currentData(), self.range_to.currentData()
+        ids = self.app.days.range_ids(day["id"], desde, hasta)
+        pending = [i for i in ids
+                   if self.app.days.invoice(i)["estado"] == InvoiceStatus.PENDIENTE]
+        if not pending:
+            return error(self, "No hay facturas pendientes en ese rango.")
+        lo, hi = sorted((desde, hasta))
+        if self._mode() == Mode.PRUEBA and len(pending) != 1:
+            return error(self, "En modo de prueba el rango debe tener una sola escuela pendiente.")
+        if not confirm(self, "Ejecutar rango",
+                       f"Se procesarán {len(pending)} factura(s) pendientes, de la #{lo} a la #{hi}.\n"
+                       f"Las ya completadas o en revisión del rango se saltan.\n\n¿Continuar?"):
+            return
+        self._start(invoice_ids=pending)
 
     def run_selected(self):
         ids = selected_ids(self.table)

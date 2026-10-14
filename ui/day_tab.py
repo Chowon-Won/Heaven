@@ -103,6 +103,19 @@ class DayTab(QWidget):
             b.clicked.connect(slot)
             row.addWidget(b)
         row.addStretch(1)
+        rng = QHBoxLayout()
+        self.range_from = QComboBox()
+        self.range_to = QComboBox()
+        only = QPushButton("Solo este rango", objectName="Primary")
+        only.clicked.connect(lambda: self._mark_range(exclusive=True))
+        add = QPushButton("Añadir este rango")
+        add.clicked.connect(lambda: self._mark_range(exclusive=False))
+        rng.addWidget(QLabel("Desde la escuela"))
+        rng.addWidget(self.range_from, 1)
+        rng.addWidget(QLabel("hasta"))
+        rng.addWidget(self.range_to, 1)
+        rng.addWidget(only)
+        rng.addWidget(add)
         presets = QHBoxLayout()
         self.preset = QComboBox()
         load = QPushButton("Cargar configuración")
@@ -120,6 +133,7 @@ class DayTab(QWidget):
         v.addLayout(presets)
         v.addWidget(self.school_search)
         v.addLayout(row)
+        v.addLayout(rng)
         v.addWidget(self.schools_table, 1)
         v.addWidget(self.count_label)
         self.stack.addWidget(page)
@@ -219,7 +233,28 @@ class DayTab(QWidget):
             t.setItem(r, 2, QTableWidgetItem(s["nombre"]))
         t.blockSignals(False)
         t.resizeColumnsToContents()
+        for combo, pick_last in ((self.range_from, False), (self.range_to, True)):
+            combo.clear()
+            for r, s in enumerate(rows):
+                combo.addItem(f"{r + 1}. {s['codigo']} — {s['nombre']}", r)
+            if rows:
+                combo.setCurrentIndex(len(rows) - 1 if pick_last else 0)
         self._filter_schools()
+        self._update_count()
+
+    def _mark_range(self, exclusive: bool):
+        """Marca las escuelas entre «desde» y «hasta» (orden de la tabla)."""
+        if self.range_from.count() == 0:
+            return
+        lo, hi = sorted((self.range_from.currentData(), self.range_to.currentData()))
+        t = self.schools_table
+        t.blockSignals(True)
+        for r in range(t.rowCount()):
+            if lo <= r <= hi:
+                self._set_row(r, True)
+            elif exclusive:
+                self._set_row(r, False)
+        t.blockSignals(False)
         self._update_count()
 
     def _filter_schools(self):

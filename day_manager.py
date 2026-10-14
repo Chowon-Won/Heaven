@@ -120,6 +120,15 @@ class DayManager:
             "SELECT * FROM facturas WHERE jornada_id = ? AND estado = ? ORDER BY orden",
             (day_id, InvoiceStatus.PENDIENTE))
 
+    def range_ids(self, day_id: int, desde_orden: int, hasta_orden: int) -> list[int]:
+        """Ids de las facturas con número de orden entre «desde» y «hasta»
+        (ambos incluidos; el orden de los extremos no importa)."""
+        lo, hi = sorted((int(desde_orden), int(hasta_orden)))
+        rows = self.db.query(
+            "SELECT id FROM facturas WHERE jornada_id = ? AND orden BETWEEN ? AND ? "
+            "ORDER BY orden", (day_id, lo, hi))
+        return [r["id"] for r in rows]
+
     def update_invoice(self, invoice_id: int, **fields) -> dict:
         fields["actualizado"] = now_iso()
         sets = ", ".join(f"{k} = ?" for k in fields)

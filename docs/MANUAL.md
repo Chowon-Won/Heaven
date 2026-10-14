@@ -29,7 +29,9 @@ Igual que Escuelas. Campos:
 2. **Producto**: lista desplegable «Pan — 1000». Botones *Añadir producto*, *Editar productos* y
    *Administrar catálogo* sin salir del asistente.
 3. **Confirmar código**: marque la casilla tras comprobar el código.
-4. **Escuelas**: marque las escuelas. *Seleccionar todas las activas*, *Desmarcar todas*, buscar, y
+4. **Escuelas**: marque las escuelas. *Seleccionar todas las activas*, *Desmarcar todas*, buscar,
+   **rango «Desde la escuela … hasta …»** (*Solo este rango* deja marcadas únicamente esas;
+   *Añadir este rango* las suma a las ya marcadas), y
    **configuraciones frecuentes** (guardar/cargar una combinación habitual de producto y escuelas).
 5. **Revisión**: fecha, producto, código, cantidad de escuelas, lista y facturas previstas.
 6. **Confirmar**: elija *simulada* o *real* y pulse **Crear jornada**.
@@ -43,6 +45,8 @@ el código de las facturas de esa jornada.
 ### 5. Automatización
 * **Jornada**: elija la jornada a procesar.
 * **Modo**: Simulado (jornadas simuladas), Prueba o Automático (jornadas reales).
+* **Ejecutar rango**: elija «Desde la escuela» y «hasta» (por su número # en la jornada) y se
+  procesan solo las pendientes de ese tramo; las completadas o en revisión se saltan.
 * **Ejecutar escuela seleccionada**, **Ejecutar grupo de prueba** (primeras N pendientes) y
   **Ejecutar todas las seleccionadas**.
 * **Confirmar la siguiente operación**: pregunta antes de cada escuela.

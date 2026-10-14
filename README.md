@@ -88,7 +88,7 @@ Los datos (base SQLite, registros y capturas de error) se guardan en
 | Automático | Procesa las escuelas seleccionadas. Bloqueado hasta superar la prueba. |
 
 Controles: Iniciar, Pausar, Reanudar, Detener, «Confirmar la siguiente operación», ejecutar una
-escuela, un grupo de prueba (primeras N) o todas.
+escuela, un **rango (desde la escuela X hasta la Y)**, un grupo de prueba (primeras N) o todas.
 
 **Parada de emergencia:** mueva el ratón a la **esquina superior izquierda** de la pantalla
 (mecanismo FAILSAFE de PyAutoGUI, comprobado antes de cada pulsación y durante cada espera).
@@ -100,7 +100,7 @@ escuela, un grupo de prueba (primeras N) o todas.
 ejecutar_pruebas.bat          (o: .venv\Scripts\python -m pytest tests\unit -v)
 ```
 
-* `tests/unit/` — 42 pruebas sin SisFaCon (catálogos, ceros iniciales, 48 escuelas, duplicados,
+* `tests/unit/` — 45 pruebas sin SisFaCon (catálogos, ceros iniciales, 48 escuelas, duplicados,
   escuela/producto incorrectos, violación de acceso, límite de intentos, guardado incierto, no
   imprimir antes de grabar, pausa/reanudar, ventanas desconocidas, jornada interrumpida, historial
   tras eliminar, exportación). **Todas pasan** con el SisFaCon simulado.
