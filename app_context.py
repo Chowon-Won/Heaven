@@ -36,6 +36,12 @@ class AppContext:
                   data_dir=data_dir)
         if seed:
             ctx.products.seed_examples_if_empty()
+        from calibration import drop_untouched_defaults
+        cal, removed = drop_untouched_defaults(ctx.settings["calibracion"])
+        if removed:
+            ctx.settings.set("calibracion", cal)
+            ctx.logger.log("INFO", "Calibración: se quitaron campos que estaban en su posición "
+                           "inicial sin colocar: " + ", ".join(removed), "AVISO")
         return ctx
 
     def make_driver(self, mode: str, step_delay: float = 0.25):

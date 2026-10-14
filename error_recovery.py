@@ -23,6 +23,7 @@ class WinKind(str, Enum):
     SEARCH = "SEARCH"
     PREVIEW = "PREVIEW"
     PRINT = "PRINT"
+    PRINT_QUESTION = "PRINT_QUESTION"   # «¿Desea imprimir…?» tras Ctrl+G
     INFO = "INFO"
     UNKNOWN = "UNKNOWN"
 
@@ -47,6 +48,10 @@ def classify_window(win: WinInfo, settings) -> Classified:
     for p in settings["titulos_dialogo_impresion"] or []:
         if p and t.strip() == p.lower():
             return Classified(win, WinKind.PRINT)
+    body = normalize_text(f"{win.title} {win.text}")
+    for word in settings["textos_pregunta_imprimir"] or []:
+        if word and normalize_text(word) in body:
+            return Classified(win, WinKind.PRINT_QUESTION)
     for rule in settings["reglas_dialogos"] or []:
         if _rule_matches(rule, win):
             return Classified(win, WinKind.INFO, rule)

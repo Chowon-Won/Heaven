@@ -118,8 +118,7 @@ def entries_to_boxes(cal: dict, ventana: str, ratio: float) -> dict[str, tuple[i
             w, h = max(w, 8), max(h, 8)
             boxes[name] = (round(x / ratio), round(y / ratio), round(w / ratio), round(h / ratio))
         else:
-            dw, dh = DEFAULT_SIZES[CALIBRATION_FIELDS[name]["tipo"]]
-            boxes[name] = (40 + 30 * pending, 120 + 44 * pending, dw, dh)
+            boxes[name] = default_box(pending, CALIBRATION_FIELDS[name]["tipo"])
             pending += 1
     return boxes
 
@@ -148,3 +147,30 @@ def boxes_to_entries(boxes: dict, cal: dict, ventana: str, ratio: float,
                      "metodo": (out.get(name) or {}).get("metodo", "auto"),
                      "ancho_ventana": win_w, "alto_ventana": win_h}
     return out
+
+
+def default_box(index: int, tipo: str) -> tuple[int, int, int, int]:
+    dw, dh = DEFAULT_SIZES[tipo]
+    return (40 + 30 * index, 120 + 44 * index, dw, dh)
+
+
+def drop_untouched_defaults(cal: dict) -> tuple[dict, list[str]]:
+    """Quita los campos que se guardaron en su posición inicial sin colocarlos
+    (fallo de versiones anteriores de la calibración con celdas)."""
+    out, removed = dict(cal or {}), []
+    for name, e in list(out.items()):
+        tipo = e.get("tipo", "region")
+        if tipo not in DEFAULT_SIZES:
+            continue
+        for ratio in (1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5):
+            for i in range(10):
+                x, y, w, h = default_box(i, tipo)
+                if (e.get("x"), e.get("y"), e.get("w"), e.get("h")) == (
+                        round(x * ratio), round(y * ratio), round(w * ratio), round(h * ratio)):
+                    removed.append(name)
+                    break
+            if removed and removed[-1] == name:
+                break
+    for name in removed:
+        out.pop(name, None)
+    return out, removed

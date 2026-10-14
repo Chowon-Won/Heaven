@@ -45,3 +45,17 @@ class TestCeldas(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCamposSinColocar(unittest.TestCase):
+    def test_quita_los_que_quedaron_en_la_posicion_inicial(self):
+        from calibration import default_box, drop_untouched_defaults
+        x, y, w, h = default_box(2, "region")
+        cal = {
+            "cantidad_linea": {"tipo": "region", "x": round(x * 1.25), "y": round(y * 1.25),
+                               "w": round(w * 1.25), "h": round(h * 1.25)},
+            "codigo_centro": {"tipo": "region", "x": 750, "y": 250, "w": 175, "h": 30},
+        }
+        out, removed = drop_untouched_defaults(cal)
+        self.assertEqual(removed, ["cantidad_linea"])
+        self.assertIn("codigo_centro", out)

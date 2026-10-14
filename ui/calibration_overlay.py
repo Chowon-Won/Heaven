@@ -44,6 +44,9 @@ class CalibrationOverlay(QWidget):
             n: QRect(*b) for n, b in entries_to_boxes(app.settings["calibracion"], ventana,
                                                       self.ratio).items()}
         self.removed: set[str] = set()
+        # Solo se guardan los campos ya calibrados o los que el usuario mueve:
+        # un recuadro que nadie colocó no indica ningún campo de SisFaCon.
+        self.touched: set[str] = {n for n in self.boxes if n in (app.settings["calibracion"] or {})}
         self.colors = {n: QColor(COLORS[i % len(COLORS)])
                        for i, n in enumerate(fields_for_window(ventana))}
         self.selected = next(iter(self.boxes), None)
@@ -184,6 +187,7 @@ class CalibrationOverlay(QWidget):
                 r.setWidth(max(10, orig.width() + d.x()))
                 r.setHeight(max(10, orig.height() + d.y()))
             self.boxes[name] = r.intersected(self.rect())
+            self.touched.add(name)
             self.update()
             return
         mode, _ = self._hit(pos)
@@ -219,6 +223,7 @@ class CalibrationOverlay(QWidget):
             else:
                 r.translate(dx, dy)
             self.boxes[self.selected] = r
+            self.touched.add(self.selected)
             self.update()
             return
         super().keyPressEvent(e)
@@ -239,15 +244,20 @@ class CalibrationOverlay(QWidget):
             self.update()
 
     def _boxes_tuple(self):
-        return {n: (r.x(), r.y(), r.width(), r.height()) for n, r in self.boxes.items()}
+        return {n: (r.x(), r.y(), r.width(), r.height()) for n, r in self.boxes.items()
+                if n in self.touched}
 
     def _save(self):
         cal = boxes_to_entries(self._boxes_tuple(), self.app.settings["calibracion"],
                                self.ventana, self.ratio, self.win_size, self.removed)
         self.app.settings.set("calibracion", cal)
-        n = len([x for x in self.boxes if x not in self.removed])
+        n = len([x for x in self.touched if x not in self.removed])
+        untouched = [SHORT.get(x, x) for x in self.boxes
+                     if x not in self.touched and x not in self.removed]
         self.saved.emit(f"Calibración guardada con celdas: {n} campo(s). "
-                        f"Ventana de SisFaCon: {self.win_size[0]}x{self.win_size[1]}.")
+                        f"Ventana de SisFaCon: {self.win_size[0]}x{self.win_size[1]}."
+                        + (f" Sin colocar (no se guardan): {', '.join(untouched)}."
+                           if untouched else ""))
         self.close()
 
     def _test_read(self):

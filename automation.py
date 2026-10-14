@@ -104,6 +104,7 @@ class InvoiceContext:
     preview_handle: int | None = None
     conduce_before: str = ""
     print_confirmed: bool = False
+    print_question_seen: bool = False   # SisFaCon preguntó «¿imprimir?» tras Ctrl+G
     recovering: bool = False
     product_typed: bool = False   # ya se escribió el código del producto alguna vez
     desc_seen: bool = False       # la descripción correcta apareció tras escribir el código
@@ -846,11 +847,27 @@ class AutomationEngine:
         self._goto(State.VERIFYING_SAVE)
         self._update(ctx)
         try:
-            preview = self._wait(ctx, "vista previa tras Ctrl+G", self._first(WinKind.PREVIEW),
-                                 {WinKind.PREVIEW}, self._t("timeout_guardado"))
+            answered: set[int] = set()
+
+            def preview_after_question(wins):
+                # Ctrl+G → «¿Imprimir?» → Aceptar → vista previa.
+                for c in wins:
+                    if c.kind == WinKind.PRINT_QUESTION and c.win.handle not in answered:
+                        answered.add(c.win.handle)
+                        ctx.print_question_seen = True
+                        self.log.log("INFO", f"Pregunta de impresión aceptada: {c.win.describe()}",
+                                     jornada=self._day, factura=inv)
+                        self.driver.press_ok(c.win)
+                return next((c for c in wins if c.kind == WinKind.PREVIEW), None)
+
+            preview = self._wait(ctx, "vista previa tras Ctrl+G", preview_after_question,
+                                 {WinKind.PREVIEW, WinKind.PRINT_QUESTION},
+                                 self._t("timeout_guardado"))
         except Timeout:
             now = parse_conduce(self._read("ultimo_conduce")) if s["exigir_cambio_ultimo_conduce"] else ""
             outcome = RecoveryPolicy.save_outcome(True, False, ctx.conduce_before, now)
+            if ctx.print_question_seen:
+                outcome = "GRABADA"   # la pregunta de imprimir solo sale tras grabar
             if outcome == "GRABADA":
                 raise FlowAbort("El conduce se grabó (cambió el número) pero no apareció la "
                                 "vista previa: imprímalo manualmente.", InvoiceStatus.GUARDADA,

@@ -61,6 +61,7 @@ class SimulatedDriver(SisFaConDriver):
         self.keeps_school_after_save = False  # tras grabar no vuelve a <<CONTADO>>
         self.has_search_button = False    # «Buscar Centro» accesible como control
         self.empty_cell_noise = ""        # lo que «lee» el OCR en una celda vacía
+        self.ask_print_after_save = True  # como SisFaCon real: Ctrl+G → «¿Imprimir?»
         self.needs_qty_enter = True       # como SisFaCon real: código+Enter, Cantidad+Enter
         self.desc_region_on_entry_row = True   # la descripción calibrada está en la fila azul
         self._qty_buffer = ""
@@ -184,6 +185,10 @@ class SimulatedDriver(SisFaConDriver):
                     self._do_print(target)
                 elif k == "{ESC}":
                     self._close(target)
+            elif kind == "printq":
+                if k == "{ENTER}":
+                    self._close(target)
+                    self._show_preview()
             elif kind in ("av", "other"):
                 if k == "{ENTER}":
                     self.ok_presses.append(self.windows[target]["info"].title)
@@ -198,6 +203,9 @@ class SimulatedDriver(SisFaConDriver):
             self.ok_presses.append(w["info"].title)
             if w["kind"] == "print":
                 self._do_print(win.handle)
+            elif w["kind"] == "printq":
+                self._close(win.handle)
+                self._show_preview()
             else:
                 self._close(win.handle)
 
@@ -346,8 +354,16 @@ class SimulatedDriver(SisFaConDriver):
             self._open_av()
             return
         self.label_stale = False
-        self._open("preview", "Preview - [No name]",
-                   f"CONDUCE NO: {conduce}\nCODIGO: {code}")
+        self._pending_preview = (conduce, code)
+        if self.ask_print_after_save:
+            self._open("printq", "Información", "¿Desea imprimir el conduce?", "TMessageForm",
+                       ["Sí", "No"])
+            return
+        self._show_preview()
+
+    def _show_preview(self) -> None:
+        conduce, code = self._pending_preview
+        self._open("preview", "Preview - [No name]", f"CONDUCE NO: {conduce}\nCODIGO: {code}")
 
     def _do_print(self, handle: int) -> None:
         if not self._of_kind("preview"):

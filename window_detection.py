@@ -340,7 +340,8 @@ class RealDriver(SisFaConDriver):
         w = self._desktop.window(handle=win.handle)
         for c in w.children():
             t = c.window_text().replace("&", "").strip().lower()
-            if t in ("ok", "aceptar") and c.class_name().lower().endswith("button"):
+            if t in ("ok", "aceptar", "sí", "si", "yes") and \
+                    c.class_name().lower().endswith("button"):
                 c.click()
                 return
         # Sin botón accesible: Enter con la ventana en primer plano.

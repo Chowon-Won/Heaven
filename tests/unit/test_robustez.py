@@ -142,3 +142,18 @@ class TestEnterCantidad(Base):
         self.assertEqual(self.drv.lines, [])        # no se añadió la línea equivocada
         self.assertEqual(len(self.drv.saved), 0)
 
+
+
+class TestPreguntaImprimir(Base):
+    def test_acepta_la_pregunta_y_sigue_con_la_vista_previa(self):
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+        self.assertEqual(self.drv.ok_presses.count("Información"), 3)
+        tipos = [e["mensaje"] for e in self.ctx.logger.search()]
+        self.assertTrue(any("Pregunta de impresión aceptada" in m for m in tipos))
+        self.assertEqual(len(self.drv.printed), 3)
+
+    def test_sin_pregunta_tambien_funciona(self):
+        self.drv.ask_print_after_save = False
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)

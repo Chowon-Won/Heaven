@@ -99,6 +99,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "confirmar_antes_de_imprimir": False,
     "tecla_imprimir": "{F9}",
     "titulos_dialogo_impresion": ["Print", "Imprimir"],
+    # Tras Ctrl+G SisFaCon pregunta si se imprime: se acepta y se abre la vista
+    # previa. Se reconoce por estas palabras en el título o el mensaje.
+    "textos_pregunta_imprimir": ["IMPRIMIR", "IMPRIME", "IMPRESION"],
     "tecla_aceptar_impresion": "{ENTER}",
     "tecla_cerrar_vista_previa": "{ESC}",
     "espera_tras_imprimir": 2.0,
