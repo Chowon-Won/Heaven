@@ -24,8 +24,8 @@ class CatalogTab(QWidget):
         if kind == "escuelas":
             self.manager = app.schools
             self.fields = SCHOOL_FIELDS
-            self.headers = ["Código", "Nombre", "Estado", "Notas"]
-            self.export_cols = ["codigo", "nombre", "activo", "notas"]
+            self.headers = ["Orden", "Código", "Nombre", "Estado", "Notas"]
+            self.export_cols = ["orden", "codigo", "nombre", "activo", "notas"]
             self.singular, self.plural = "escuela", "escuelas"
             self.template = ROOT / "plantillas" / "plantilla_escuelas.csv"
         else:
@@ -76,7 +76,7 @@ class CatalogTab(QWidget):
     def _row(self, r: dict) -> list:
         estado = "Activo" if r["activo"] else "Inactivo"
         if self.kind == "escuelas":
-            return [r["codigo"], r["nombre"], estado, r["notas"]]
+            return [r["orden"] or "", r["codigo"], r["nombre"], estado, r["notas"]]
         return [r["codigo"], r["nombre"], r["texto_verificacion"] or "(igual al nombre)",
                 estado, r["descripcion"]]
 

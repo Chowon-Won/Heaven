@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS escuelas (
     nombre      TEXT NOT NULL,
     activo      INTEGER NOT NULL DEFAULT 1,
     notas       TEXT NOT NULL DEFAULT '',
+    orden       INTEGER NOT NULL DEFAULT 0,
     eliminado   INTEGER NOT NULL DEFAULT 0,
     creado      TEXT NOT NULL,
     actualizado TEXT NOT NULL
@@ -139,9 +140,16 @@ class Database:
             if self.path != ":memory:":
                 self._conn.execute("PRAGMA journal_mode = WAL")
             self._conn.executescript(SCHEMA)
+            self._migrate()
             self._conn.execute(
                 "INSERT OR IGNORE INTO meta(clave, valor) VALUES('schema', ?)",
                 (str(SCHEMA_VERSION),))
+
+    def _migrate(self) -> None:
+        """Añade columnas nuevas a bases de datos creadas por versiones anteriores."""
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(escuelas)")}
+        if "orden" not in cols:
+            self._conn.execute("ALTER TABLE escuelas ADD COLUMN orden INTEGER NOT NULL DEFAULT 0")
 
     # ------------------------------------------------------------------
     def execute(self, sql: str, params: Iterable[Any] = ()) -> int:

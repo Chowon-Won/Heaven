@@ -14,6 +14,7 @@ HEADER_ALIASES = {
     "nombre": "nombre", "name": "nombre", "nombre completo": "nombre",
     "nombre centro": "nombre", "nombre centro o cliente": "nombre",
     "escuela": "nombre", "producto": "nombre",
+    "orden": "orden", "orden ruta": "orden", "orden en la ruta": "orden", "no": "orden",
     "activo": "activo", "estado": "activo", "activa": "activo",
     "notas": "notas", "nota": "notas", "observaciones": "notas",
     "descripcion": "descripcion",

@@ -9,9 +9,11 @@ class SchoolManager(CatalogManager):
     entity = "escuela"
     text_fields = ("nombre", "notas")
     required_fields = ("codigo", "nombre")
+    int_fields = ("orden",)
 
     def _order_by(self) -> str:
-        return "codigo"
+        # Orden de ruta primero (0 = sin orden, al final), luego por código.
+        return "CASE WHEN orden > 0 THEN 0 ELSE 1 END, orden, codigo"
 
     def active_ids(self) -> list[int]:
         return [r["id"] for r in self.list(only_active=True)]

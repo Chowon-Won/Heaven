@@ -65,6 +65,8 @@ class CatalogManager:
     # Campos editables además de codigo/activo.
     text_fields: tuple[str, ...] = ()
     required_fields: tuple[str, ...] = ("codigo",)
+    # Campos numéricos opcionales (p. ej. orden de ruta).
+    int_fields: tuple[str, ...] = ()
 
     def __init__(self, db: Database):
         self.db = db
@@ -112,6 +114,11 @@ class CatalogManager:
         for f in self.text_fields:
             clean[f] = str(data.get(f) or "").strip()
         clean["activo"] = 1 if data.get("activo", True) else 0
+        for f in self.int_fields:
+            try:
+                clean[f] = max(0, int(float(str(data.get(f) or 0).strip() or 0)))
+            except ValueError:
+                raise CatalogError(f"«{f}» debe ser un número entero.")
         for f in self.required_fields:
             if not clean.get(f):
                 raise CatalogError(f"El campo «{f}» es obligatorio.")
@@ -184,6 +191,7 @@ class CatalogManager:
                     if update_existing:
                         self.update(existing["id"], **{k: v for k, v in row.items()
                                                        if k in self.text_fields
+                                                       or k in self.int_fields
                                                        or k in ("codigo", "activo")})
                         report.actualizados += 1
                     else:
