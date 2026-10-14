@@ -79,6 +79,22 @@ def escape_keys(text: str) -> str:
 DIALOG_CLASSES = ("#32770", "TMessageForm")
 
 
+def _ocr_accept():
+    """Criterios para dar por buena una lectura OCR sin probar más variantes."""
+    import re
+    from verification import parse_conduce, parse_line_count
+    return {
+        "contador_lineas": lambda t: parse_line_count(t) is not None,
+        "ultimo_conduce": lambda t: bool(parse_conduce(t)),
+        "codigo_centro": lambda t: bool(re.search(r"\d{4,}|PERSONAL", t.upper())),
+        "nombre_centro": lambda t: len(t.strip()) >= 4,
+        "descripcion_producto": lambda t: len(t.strip()) >= 3,
+    }
+
+
+_OCR_ACCEPT = _ocr_accept()
+
+
 class RealDriver(SisFaConDriver):
     """Controla la aplicación real. Solo funciona en Windows."""
 
@@ -134,17 +150,22 @@ class RealDriver(SisFaConDriver):
 
     def focus_window(self, handle: int) -> None:
         self._check_emergency()
-        w = self._desktop.window(handle=handle)
-        try:
-            if w.is_minimized():
-                w.restore()
-            w.set_focus()
-        except Exception as exc:
-            raise DriverError(f"No se pudo activar la ventana: {exc}") from exc
-        time.sleep(0.15)
         import win32gui
-        if win32gui.GetForegroundWindow() != handle:
-            raise DriverError("Windows no permitió poner SisFaCon en primer plano.")
+        w = self._desktop.window(handle=handle)
+        last_error = None
+        for _ in range(4):
+            try:
+                if w.is_minimized():
+                    w.restore()
+                w.set_focus()
+            except Exception as exc:  # p. ej. la ventana se está redibujando
+                last_error = exc
+            time.sleep(0.2)
+            if win32gui.GetForegroundWindow() == handle:
+                return
+            time.sleep(0.3)
+        raise DriverError("Windows no permitió poner SisFaCon en primer plano"
+                          + (f": {last_error}" if last_error else "."))
 
     def window_exists(self, handle: int) -> bool:
         import win32gui
@@ -190,7 +211,10 @@ class RealDriver(SisFaConDriver):
         pending = []
         self._baseline = set()
         for w in self._process_windows():
-            info = self._info(w)
+            try:
+                info = self._info(w)
+            except Exception:
+                continue  # la ventana se cerró mientras se leía
             if info.class_name in DIALOG_CLASSES or self._is_transient_title(info.title):
                 pending.append(info)
             else:
@@ -317,8 +341,8 @@ class RealDriver(SisFaConDriver):
             text = self._control_text_at(x, y, w, h)
             if text or method == "control":
                 return text
-        return self.ocr.read_rect((x, y, w, h), digits=name in ("codigo_centro",),
-                                  variants=name in ("contador_lineas", "ultimo_conduce"))
+        return self.ocr.read_rect((x, y, w, h), digits=name == "codigo_centro",
+                                  variants=True, accept=_OCR_ACCEPT.get(name))
 
     def _control_text_at(self, x, y, w, h) -> str | None:
         """Texto del control de Windows situado en la región, si encaja."""

@@ -62,6 +62,9 @@ def text_matches(expected: str, read: str | None, threshold: float = 0.8) -> boo
     """Nombre o descripción: contenido o similitud suficiente."""
     if not read:
         return False
+    parts = [p for p in str(read).split("|") if p.strip()]
+    if len(parts) > 1:  # varias lecturas OCR: basta con que una coincida
+        return any(text_matches(expected, p, threshold) for p in parts)
     ne, nr = normalize_text(expected), normalize_text(read)
     if not ne:
         return False

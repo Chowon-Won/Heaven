@@ -50,12 +50,14 @@ class OcrEngine:
             self._ready = False
         return self._ready
 
-    def read_rect(self, rect, digits: bool = False, variants: bool = False) -> str | None:
+    def read_rect(self, rect, digits: bool = False, variants: bool = False,
+                  accept=None) -> str | None:
         """Lee el texto de una región de pantalla.
 
         Con ``variants=True`` prueba varios tratamientos de imagen (útil para
         rótulos pequeños, en cursiva o de color, como «0 Linea(s)») y devuelve
         los resultados separados por « | » para que el llamador elija.
+        ``accept(texto)`` permite parar en cuanto una lectura es válida (rápido).
         """
         if not self.available():
             return None
@@ -80,6 +82,8 @@ class OcrEngine:
                 except pytesseract.TesseractError:
                     text = pytesseract.image_to_string(img, lang="eng", config=config)
                 text = " ".join(text.split())
+                if text and accept is not None and accept(text):
+                    return text
                 if text and text not in texts:
                     texts.append(text)
             return " | ".join(texts) or None

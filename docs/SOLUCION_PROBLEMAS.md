@@ -15,6 +15,16 @@
 | La escala de Windows (125 %, 150 %) desplaza los clics | Coordenadas con escalado | El programa usa coordenadas reales de pantalla; recalibre tras cambiar la escala. |
 | Al importar se pierden ceros | El archivo se guardó desde Excel como número | Use la plantilla CSV, o formatee la columna como Texto o con formato `00000`. |
 
+## Comportamientos automáticos de seguridad (versión 1.0.4)
+* **Búsqueda sin resultados:** cierra «Seleccione un Cliente» con Esc y reintenta una vez por el
+  otro dato (nombre o código). Si sigue sin encontrarla, la marca «Error (no grabada)».
+* **Contador «Linea(s)» ilegible:** verifica el producto por su descripción y exige que el formulario
+  sea nuevo (CODIGO = PERSONAL). Si SisFaCon dejara siempre la última escuela tras grabar, vacíe
+  «Código de un formulario nuevo» en Configuración.
+* **«ULTIMAS CONDUCE» ilegible:** la grabación se confirma solo con la ventana Preview.
+* **Reintentar errores (no grabadas):** botón en Automatización que vuelve a pendientes, de una vez,
+  las facturas que se detuvieron antes de Ctrl+G. Las de «Necesita revisión» no se tocan.
+
 ## Archivos útiles
 * Registro detallado: `%LOCALAPPDATA%\SisFaConAutoFacturador\registros\autofacturador.log`
 * Capturas de pantalla de cada error: `...\capturas\`

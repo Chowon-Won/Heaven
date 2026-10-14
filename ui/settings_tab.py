@@ -30,6 +30,8 @@ FIELDS = [
     ]),
     ("Verificaciones", [
         ("buscar_escuela_por", "Buscar la escuela por", "choice", ["codigo", "nombre"]),
+        ("reintentar_busqueda_alternativa", "Si no encuentra la escuela, reintentar por el otro dato", "bool"),
+        ("codigo_formulario_nuevo", "Código de un formulario nuevo (vacío = no comprobar)", "text"),
         ("verificar_nombre_escuela", "Verificar también el nombre de la escuela", "bool"),
         ("verificar_contador_lineas", "Verificar contador «Linea(s)»", "bool"),
         ("contador_lineas_opcional", "Si el contador no se puede leer, verificar solo la descripción", "bool"),

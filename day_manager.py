@@ -211,6 +211,17 @@ class DayManager:
                             guardado_intentado=0, intentos_recuperacion=0,
                             etapa="IDLE", mensaje="Restablecida manualmente a pendiente.")
 
+    def reset_errors(self, day_id: int) -> int:
+        """Vuelve a PENDIENTE las facturas en ERROR (se sabe que no se grabaron:
+        el error ocurrió antes de pulsar Ctrl+G). Las de REVISION no se tocan."""
+        rows = self.db.query("SELECT id FROM facturas WHERE jornada_id = ? AND estado = ? "
+                             "AND guardado_intentado = 0", (day_id, InvoiceStatus.ERROR))
+        for r in rows:
+            self.update_invoice(r["id"], estado=InvoiceStatus.PENDIENTE, etapa="IDLE",
+                                intentos_recuperacion=0,
+                                mensaje="Reintento tras error sin grabar.")
+        return len(rows)
+
     def mark_completed_manually(self, invoice_id: int, printed: bool) -> None:
         self.update_invoice(invoice_id, estado=InvoiceStatus.COMPLETADA,
                             estado_impresion=PrintStatus.IMPRESA if printed

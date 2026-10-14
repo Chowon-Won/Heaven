@@ -123,7 +123,8 @@ class AutomationTab(QWidget):
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._menu)
         manual = QHBoxLayout()
-        for text, slot in (("Marcar pendiente (verifiqué que NO existe)", self.mark_pending),
+        for text, slot in (("Reintentar errores (no grabadas)", self.retry_errors),
+                           ("Marcar pendiente (verifiqué que NO existe)", self.mark_pending),
                            ("Marcar completada (verifiqué en SisFaCon)", self.mark_done),
                            ("Omitir", self.mark_skip)):
             b = QPushButton(text)
@@ -328,6 +329,21 @@ class AutomationTab(QWidget):
                 self.app.days.mark_completed_manually(i, printed)
                 self.app.logger.log("INFO", "Marcada como completada por el usuario.",
                                     factura=self.app.days.invoice(i))
+            self.refresh_invoices()
+
+    def retry_errors(self):
+        if self.ctl.running:
+            return error(self, "Detenga la automatización antes de cambiar estados.")
+        day = self.current_day()
+        if not day:
+            return
+        if confirm(self, "Reintentar errores",
+                   "Las facturas en «Error (no grabada)» se detuvieron ANTES de pulsar Ctrl+G, "
+                   "así que no existen en SisFaCon.\n\nAntes de continuar deje SisFaCon con un "
+                   "formulario nuevo (pulse «Cancelar» o «Nuevo»).\n\n¿Volver a ponerlas como "
+                   "pendientes?"):
+            n = self.app.days.reset_errors(day["id"])
+            self.app.logger.log("INFO", f"{n} factura(s) con error vuelven a pendiente.", jornada=day)
             self.refresh_invoices()
 
     def mark_skip(self):

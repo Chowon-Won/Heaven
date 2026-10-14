@@ -55,6 +55,10 @@ class SimulatedDriver(SisFaConDriver):
         self.faults: list[dict] = []
         self.emergency = False
         self.counter_unreadable = False   # imita un OCR que no lee «Linea(s)»
+        self.conduce_unreadable = False   # imita un OCR que no lee «CONDUCE: FCR …»
+        self.search_names_only = False    # la búsqueda solo filtra por nombre
+        self.no_match_selects_first = False  # Enter sin resultados elige la 1.ª fila
+        self.keeps_school_after_save = False  # tras grabar no vuelve a <<CONTADO>>
 
     # ------------------------------------------------------------ fallos
     def inject(self, event: str, code: str | None = None, times: int = 1, **kw) -> None:
@@ -214,6 +218,8 @@ class SimulatedDriver(SisFaConDriver):
             if name == "nombre_centro":
                 return self.school[1]
             if name == "ultimo_conduce":
+                if self.conduce_unreadable:
+                    return None
                 return f"CONDUCE: FCR {self.last_conduce - (1 if self.label_stale else 0):07d}"
             if name == "contador_lineas":
                 return None if self.counter_unreadable else f"{len(self.lines)} Linea(s)"
@@ -232,13 +238,18 @@ class SimulatedDriver(SisFaConDriver):
     def _confirm_search(self, handle: int) -> None:
         text = self.windows[handle].get("search", "").strip()
         match = None
-        if text in self.clients:
+        if text in self.clients and not self.search_names_only:
             match = (text, self.clients[text])
         else:
             for c, n in self.clients.items():
                 if text and text.upper() in n.upper():
                     match = (c, n)
                     break
+        if match is None:
+            if not self.no_match_selects_first or not self.clients:
+                return            # sin resultados: la búsqueda sigue abierta
+            first = next(iter(self.clients))
+            match = (first, self.clients[first])
         self._close(handle)
         if self._fault("av_on_select", text):
             self._open_av()
@@ -286,7 +297,8 @@ class SimulatedDriver(SisFaConDriver):
                            "productos": [c for c, _ in self.lines]})
         self.lines = []
         self.entry_desc = ""
-        self.school = CONTADO
+        if not self.keeps_school_after_save:
+            self.school = CONTADO
         if self._fault("av_on_save_saved", code):
             self.label_stale = True
             self._open_av()

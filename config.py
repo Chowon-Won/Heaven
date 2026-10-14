@@ -59,6 +59,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # "codigo" o "nombre": qué se escribe en «Texto búsqueda».
     "buscar_escuela_por": "codigo",
     "verificar_nombre_escuela": False,
+    # Si la búsqueda por código no encuentra la escuela, reintentar por nombre
+    # (o al revés). Seguro: aún no se ha introducido el producto.
+    "reintentar_busqueda_alternativa": True,
+    # CODIGO que muestra SisFaCon en un formulario nuevo (cliente <<CONTADO>>).
+    # Se usa para confirmar que el formulario está limpio cuando el contador
+    # «Linea(s)» no se puede leer. Vacío = no comprobar.
+    "codigo_formulario_nuevo": "PERSONAL",
     "umbral_similitud_nombre": 0.80,
 
     # --- Producto --------------------------------------------------------
@@ -152,7 +159,8 @@ CALIBRATION_FIELDS: dict[str, dict[str, str]] = {
     },
     "descripcion_producto": {
         "ventana": "principal", "tipo": "region",
-        "descripcion": "Descripción del producto (fila de entrada o primera línea)",
+        "descripcion": "Descripción del producto en la PRIMERA LÍNEA de la tabla inferior "
+                       "(aparece solo cuando el producto se añadió de verdad)",
     },
     "texto_busqueda": {
         "ventana": "busqueda", "tipo": "punto",

@@ -56,9 +56,18 @@ class TestFlujoNormal(Base):
 
 
 class TestVerificaciones(Base):
+    def test_07_escuela_incorrecta_una_vez_se_corrige(self):
+        code = self.invoices()[1]["escuela_codigo"]
+        self.drv.inject("wrong_school", code)          # solo la primera búsqueda falla
+        self.engine.run(self.day, RunOptions())
+        self.assertEqual(self.states(), [InvoiceStatus.COMPLETADA] * 3)
+        self.assertEqual([s["escuela"] for s in self.drv.saved],
+                         [i["escuela_codigo"] for i in self.invoices()])
+
     def test_07_escuela_incorrecta_no_graba(self):
         code = self.invoices()[1]["escuela_codigo"]
-        self.drv.inject("wrong_school", code)
+        self.drv.inject("wrong_school", code, times=-1)
+        self.drv.inject("wrong_school", self.invoices()[1]["escuela_nombre"], times=-1)
         self.engine.run(self.day, RunOptions())
         st = self.states()
         self.assertEqual(st[0], InvoiceStatus.COMPLETADA)
@@ -67,7 +76,7 @@ class TestVerificaciones(Base):
         self.assertEqual(self.drv.saved_count(code), 0)
         self.assertEqual(len(self.drv.saved), 1)
         self.assertEqual(self.engine.sm.state, State.ERROR)
-        self.assertIn("Escuela incorrecta", self.invoices()[1]["mensaje"])
+        self.assertIn("Escuela no seleccionada", self.invoices()[1]["mensaje"])
 
     def test_08_producto_no_reconocido(self):
         self.drv.inject("unknown_product", "1000")

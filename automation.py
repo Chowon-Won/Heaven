@@ -193,6 +193,7 @@ class AutomationEngine:
         self._resume.set()
         self._running = True
         self._counter_warned = False
+        self._conduce_warned = False
         self.sm.reset()
         completed = halted = 0
         reason = ""
@@ -281,8 +282,6 @@ class AutomationEngine:
             needed.append("descripcion_producto")
         if s["verificar_nombre_escuela"]:
             needed.append("nombre_centro")
-        if s["exigir_cambio_ultimo_conduce"]:
-            needed.append("ultimo_conduce")
         missing = [n for n in needed if not self.driver.is_calibrated(n)]
         if missing:
             raise FlowAbort("Falta calibrar: " + ", ".join(missing) +
@@ -372,6 +371,10 @@ class AutomationEngine:
     def _t(self, key: str) -> float:
         return float(self.settings[key])
 
+    def _verify_timeout(self) -> float:
+        """Tiempo para que un dato aparezca en pantalla (el OCR puede ser lento)."""
+        return max(self._t("espera_estabilizacion") + 2, self._t("timeout_ventana") / 2)
+
     def _scan(self, ctx: InvoiceContext, allowed: set[WinKind]) -> list[Classified]:
         """Clasifica las ventanas abiertas. Lanza ante errores o desconocidas."""
         found = []
@@ -438,6 +441,9 @@ class AutomationEngine:
         return self.driver.read_field(name)
 
     def _read_lines(self) -> int | None:
+        # Si ya se comprobó en esta ejecución que es ilegible, no se pierde tiempo en OCR.
+        if getattr(self, "_counter_warned", False) and self._counter_optional():
+            return None
         return parse_line_count(self._read("contador_lineas"))
 
     def _counter_optional(self) -> bool:
@@ -518,6 +524,7 @@ class AutomationEngine:
             n = self._read_lines()
             if n is None and self._counter_optional():
                 self._warn_counter(ctx)
+                self._require_new_form(ctx)
             elif n is None:
                 raise FlowAbort("No se pudo leer el contador «Linea(s)». Revise la calibración "
                                 "o la instalación de Tesseract.", InvoiceStatus.PENDIENTE)
@@ -527,35 +534,46 @@ class AutomationEngine:
                                 InvoiceStatus.PENDIENTE)
         self.driver.focus_main()
 
+    def _require_new_form(self, ctx: InvoiceContext) -> None:
+        """Sin contador legible, se exige un formulario nuevo (cliente por defecto)
+        para no añadir el producto a un conduce que ya tiene líneas."""
+        expected = (self.settings["codigo_formulario_nuevo"] or "").strip()
+        if not expected:
+            return
+        read = self._read("codigo_centro")
+        if read is not None and read.strip() and not codes_match(expected, read):
+            raise FlowAbort(f"El formulario de SisFaCon no es nuevo: muestra «{read.strip()}» en "
+                            f"CODIGO y se esperaba «{expected}». Pulse «Nuevo» o «Cancelar» en "
+                            "SisFaCon y vuelva a iniciar. (Si SisFaCon deja siempre la última "
+                            "escuela tras grabar, vacíe «Código de un formulario nuevo» en "
+                            "Configuración).", InvoiceStatus.PENDIENTE)
+
     def _select_school(self, ctx: InvoiceContext) -> None:
+        """F7 -> búsqueda -> Enter -> verificar el código mostrado.
+
+        Si la búsqueda no encuentra la escuela o selecciona otra, se reintenta
+        UNA vez buscando por el otro dato (nombre/código). Es seguro porque en
+        este punto el formulario todavía no tiene el producto.
+        """
         inv = ctx.inv
-        self._goto(State.SELECTING_SCHOOL, inv["escuela_codigo"])
-        self._update(ctx)
-        self.driver.send_keys(self.settings["tecla_buscar_cliente"])
-        search = self._wait(ctx, "abrir «Seleccione un Cliente»", self._first(WinKind.SEARCH),
-                            {WinKind.SEARCH}, self._t("timeout_ventana"))
-        text = inv["escuela_codigo"] if self.settings["buscar_escuela_por"] == "codigo" \
-            else inv["escuela_nombre"]
-        self.driver.type_search_text(search.win.handle, text)
-        self._sleep(self._t("espera_tras_tecla"))
-        self._scan(ctx, {WinKind.SEARCH})
-        self.driver.send_keys(self.settings["tecla_confirmar_busqueda"], search.win.handle)
-        self._wait(ctx, "cerrar «Seleccione un Cliente»", self._none_of(WinKind.SEARCH),
-                   {WinKind.SEARCH}, self._t("timeout_ventana"))
-        self._goto(State.VERIFYING_SCHOOL)
-        self._update(ctx)
-        last = {"code": None}
-
-        def ok() -> bool:
-            last["code"] = self._read("codigo_centro")
-            return codes_match(inv["escuela_codigo"], last["code"])
-
-        if not self._poll_until(ctx, "verificar escuela", ok, self._t("espera_estabilizacion") + 2):
-            self.log.log("ESCUELA_INCORRECTA",
-                         f"Se esperaba {inv['escuela_codigo']} y SisFaCon muestra «{last['code']}».",
-                         "ERROR", jornada=self._day, factura=inv)
-            raise FlowAbort(f"Escuela incorrecta: se esperaba {inv['escuela_codigo']} y "
-                            f"SisFaCon muestra «{last['code'] or 'nada legible'}». No se grabó nada.",
+        by_code = self.settings["buscar_escuela_por"] == "codigo"
+        texts = [inv["escuela_codigo"] if by_code else inv["escuela_nombre"]]
+        if self.settings["reintentar_busqueda_alternativa"]:
+            texts.append(inv["escuela_nombre"] if by_code else inv["escuela_codigo"])
+        problem = ""
+        for attempt, text in enumerate(texts):
+            if attempt:
+                self.log.log("INFO", f"{problem} Se reintenta buscando «{text}».", "AVISO",
+                             jornada=self._day, factura=inv)
+                self._goto(State.RECOVERING, "Reintento de búsqueda")
+            found, read = self._search_school(ctx, text)
+            if found and codes_match(inv["escuela_codigo"], read):
+                break
+            problem = (f"«{text}» no aparece en «Seleccione un Cliente»." if not found else
+                       f"Se esperaba {inv['escuela_codigo']} y SisFaCon muestra «{read or 'nada legible'}».")
+        else:
+            self.log.log("ESCUELA_INCORRECTA", problem, "ERROR", jornada=self._day, factura=inv)
+            raise FlowAbort(f"Escuela no seleccionada: {problem} No se grabó nada.",
                             InvoiceStatus.ERROR)
         if self.settings["verificar_nombre_escuela"]:
             name = self._read("nombre_centro")
@@ -564,6 +582,39 @@ class AutomationEngine:
                 raise FlowAbort(f"El nombre mostrado «{name}» no coincide con "
                                 f"«{inv['escuela_nombre']}».", InvoiceStatus.ERROR)
         self.log.log("ESCUELA_SELECCIONADA", jornada=self._day, factura=inv)
+
+    def _search_school(self, ctx: InvoiceContext, text: str) -> tuple[bool, str | None]:
+        """Un intento de búsqueda. Devuelve (se cerró la búsqueda, código leído)."""
+        self._goto(State.SELECTING_SCHOOL, text)
+        self._update(ctx)
+        self.driver.send_keys(self.settings["tecla_buscar_cliente"])
+        search = self._wait(ctx, "abrir «Seleccione un Cliente»", self._first(WinKind.SEARCH),
+                            {WinKind.SEARCH}, self._t("timeout_ventana"))
+        self.driver.type_search_text(search.win.handle, text)
+        self._sleep(self._t("espera_tras_tecla"))
+        self._scan(ctx, {WinKind.SEARCH})
+        self.driver.send_keys(self.settings["tecla_confirmar_busqueda"], search.win.handle)
+        try:
+            self._wait(ctx, "cerrar «Seleccione un Cliente»", self._none_of(WinKind.SEARCH),
+                       {WinKind.SEARCH}, self._t("timeout_ventana"))
+        except Timeout:
+            # Sin resultados: la ventana sigue abierta. Esc la cierra sin elegir nada.
+            if self.driver.window_exists(search.win.handle):
+                self.driver.send_keys("{ESC}", search.win.handle)
+            self._wait(ctx, "cerrar la búsqueda con Esc", self._none_of(WinKind.SEARCH),
+                       {WinKind.SEARCH}, self._t("timeout_ventana"))
+            self._goto(State.VERIFYING_SCHOOL, "Sin resultados")
+            return False, None
+        self._goto(State.VERIFYING_SCHOOL)
+        self._update(ctx)
+        last = {"code": None}
+
+        def ok() -> bool:
+            last["code"] = self._read("codigo_centro")
+            return codes_match(ctx.inv["escuela_codigo"], last["code"])
+
+        self._poll_until(ctx, "verificar escuela", ok, self._verify_timeout())
+        return True, last["code"]
 
     def _product_ok(self, expect_lines: int = 1) -> tuple[bool, str]:
         s, day = self.settings, self._day
@@ -618,7 +669,7 @@ class AutomationEngine:
             return good
 
         if not self._poll_until(ctx, "verificar producto", ok,
-                                self._t("espera_estabilizacion") + 2):
+                                self._verify_timeout()):
             self.log.log("PRODUCTO_INCORRECTO", info["detail"], "ERROR",
                          jornada=day, factura=ctx.inv)
             raise FlowAbort(f"SisFaCon no reconoció el producto {day['producto_codigo']} "
@@ -647,11 +698,14 @@ class AutomationEngine:
         good, detail = self._product_ok(1)
         if not good:
             raise FlowAbort(f"El producto cambió antes de grabar ({detail}).", InvoiceStatus.ERROR)
-        if s["exigir_cambio_ultimo_conduce"]:
+        if s["exigir_cambio_ultimo_conduce"] and self.driver.is_calibrated("ultimo_conduce"):
             ctx.conduce_before = parse_conduce(self._read("ultimo_conduce"))
-            if not ctx.conduce_before:
-                raise FlowAbort("No se pudo leer «ULTIMAS CONDUCE REGISTRADO» antes de grabar.",
-                                InvoiceStatus.ERROR)
+            if not ctx.conduce_before and not getattr(self, "_conduce_warned", False):
+                # La vista previa sigue siendo la prueba principal de grabación.
+                self._conduce_warned = True
+                self.log.log("INFO", "No se puede leer «ULTIMAS CONDUCE REGISTRADO»: la grabación "
+                             "se confirma solo con la vista previa.", "AVISO",
+                             jornada=self._day, factura=ctx.inv)
         # Se registra el intento ANTES de pulsar: si el programa se cierra
         # justo después, la factura quedará como «revisar», nunca se repetirá.
         ctx.save_attempted = True
@@ -740,7 +794,7 @@ class AutomationEngine:
     def _finish(self, ctx: InvoiceContext) -> None:
         s = self.settings
         after = ""
-        if s["exigir_cambio_ultimo_conduce"]:
+        if s["exigir_cambio_ultimo_conduce"] and ctx.conduce_before:
             box = {"v": ""}
 
             def changed() -> bool:
@@ -748,7 +802,7 @@ class AutomationEngine:
                 return bool(box["v"]) and box["v"] != ctx.conduce_before
 
             if not self._poll_until(ctx, "número de conduce", changed,
-                                    self._t("espera_estabilizacion") + 2):
+                                    self._verify_timeout()):
                 raise FlowAbort("Se vio la vista previa pero el rótulo «ULTIMAS CONDUCE "
                                 "REGISTRADO» no cambió. Verifique el conduce en SisFaCon.",
                                 InvoiceStatus.GUARDADA, ctx.inv["estado_impresion"])
