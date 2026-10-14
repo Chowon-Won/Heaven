@@ -89,6 +89,32 @@ Descargar $TessUrl (Join-Path $Redist 'tesseract-setup.exe')
 Descargar "$TessData/spa.traineddata" (Join-Path $Redist 'tessdata\spa.traineddata')
 Descargar "$TessData/eng.traineddata" (Join-Path $Redist 'tessdata\eng.traineddata')
 
+# Tesseract se incluye DENTRO del programa (carpeta tesseract\): se extrae el
+# instalador con 7-Zip, así no depende de que la instalación aparte funcione.
+$TessDir = Join-Path $Redist 'tesseract'
+if (-not (Test-Path "$TessDir\tesseract.exe")) {
+    $SevenZip = $null
+    foreach ($c in @("$env:ProgramFiles\7-Zip\7z.exe", "${env:ProgramFiles(x86)}\7-Zip\7z.exe")) {
+        if (Test-Path $c) { $SevenZip = $c; break }
+    }
+    if (-not $SevenZip) { $cmd = Get-Command 7z -ErrorAction SilentlyContinue; if ($cmd) { $SevenZip = $cmd.Source } }
+    if (-not $SevenZip) { throw 'Se necesita 7-Zip (https://www.7-zip.org) para incluir Tesseract en el instalador.' }
+    if (Test-Path $TessDir) { Remove-Item $TessDir -Recurse -Force }
+    Ejecutar $SevenZip @('x', (Join-Path $Redist 'tesseract-setup.exe'), "-o$TessDir", '-y', '-bso0', '-bsp0')
+    Get-ChildItem $TessDir -Directory -Filter '$*' | Remove-Item -Recurse -Force
+    Get-ChildItem $TessDir -File -Filter 'uninstall*' | Remove-Item -Force
+}
+if (-not (Test-Path "$TessDir\tesseract.exe")) { throw 'No se pudo extraer tesseract.exe del instalador de Tesseract.' }
+Write-Host "   Comprobando Tesseract incluido..."
+$env:TESSDATA_PREFIX = (Join-Path $Redist 'tessdata')
+$prevEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+$ver = & "$TessDir\tesseract.exe" --version 2>&1 | Select-Object -First 1
+Write-Host "   $ver"
+$langs = (& "$TessDir\tesseract.exe" --list-langs 2>&1) -join ' '
+if ($langs -notmatch 'spa') { throw "Tesseract incluido no encuentra el idioma español: $langs" }
+$ErrorActionPreference = $prevEap
+Remove-Item Env:TESSDATA_PREFIX
+
 # ------------------------------------------------------------ 6. Inno Setup
 Paso 6 'Inno Setup (creador del instalador)'
 function Buscar-ISCC {

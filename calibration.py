@@ -77,11 +77,13 @@ class Calibrator:
         ctrl = self.driver._control_text_at(x, y, w, h)
         ocr = None
         if entry.get("metodo") != "control":
-            ocr = self.driver.ocr.read_rect((x, y, w, h))
+            from window_detection import _OCR_ACCEPT
+            ocr = self.driver.ocr.read_rect((x, y, w, h), variants=True,
+                                            accept=_OCR_ACCEPT.get(field_name))
         parts = [f"Control de Windows: «{ctrl}»" if ctrl else "Control de Windows: (sin texto)"]
         if entry.get("metodo") != "control":
             parts.append(f"OCR: «{ocr}»" if ocr else
-                         "OCR: (sin resultado — ¿Tesseract instalado?)")
+                         "OCR: (sin resultado) — " + self.driver.ocr.status())
         parts.append(f"Lectura usada por el macro: «{self.driver.read_field(field_name)}»")
         return "\n".join(parts)
 

@@ -384,19 +384,51 @@ class RealDriver(SisFaConDriver):
                                   variants=True, accept=_OCR_ACCEPT.get(name))
 
     def _control_text_at(self, x, y, w, h) -> str | None:
-        """Texto del control de Windows situado en la región, si encaja."""
+        """Texto del control de Windows situado bajo la región.
+
+        Recorre TODOS los controles hijos de SisFaCon (también los bloqueados o
+        de solo lectura, que Windows ignora al preguntar «qué hay en este
+        punto») y lee el más pequeño que contiene el centro de la región.
+        """
+        import win32gui
+        cx, cy = x + w // 2, y + h // 2
+        parents = []
         try:
-            ctrl = self._desktop.from_point(x + w // 2, y + h // 2)
+            if self._main is not None or self.find_main():
+                parents.append(self._main.handle)
+                for win in self._process_windows():   # p. ej. «Seleccione un Cliente»
+                    parents.append(win.handle)
         except Exception:
-            return None
-        if ctrl is None or (self._main and ctrl.handle == self._main.handle):
-            return None
-        r = ctrl.rectangle()
-        # El control debe corresponder a la región, no a un panel enorme.
-        if r.width() * r.height() > max(4 * w * h, w * h + 20000):
-            return None
-        text = ctrl.window_text().strip()
-        return text or None
+            pass
+        limit = max(4 * w * h, w * h + 20000)
+        found = []
+
+        def collect(hwnd, _):
+            try:
+                if not win32gui.IsWindowVisible(hwnd):
+                    return True
+                left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+                if left <= cx < right and top <= cy < bottom:
+                    area = (right - left) * (bottom - top)
+                    if area <= limit:
+                        found.append((area, hwnd))
+            except Exception:
+                pass
+            return True
+
+        for parent in parents:
+            try:
+                win32gui.EnumChildWindows(parent, collect, None)
+            except Exception:
+                continue
+        for _area, hwnd in sorted(found):
+            try:
+                text = self._desktop.window(handle=hwnd).window_text().strip()
+            except Exception:
+                continue
+            if text:
+                return text
+        return None
 
     # -------------------------------------------------------------- otros
     def screenshot(self, path: Path) -> bool:

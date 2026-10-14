@@ -442,8 +442,7 @@ class SettingsTab(QWidget):
                              "contador_lineas", "descripcion_producto"):
                     if drv.is_calibrated(name):
                         lines.append(f"{name}: «{drv.read_field(name)}»")
-                lines.append("OCR disponible: " + ("sí" if drv.ocr.available() else
-                                                   "no (instale Tesseract si algún campo lo necesita)"))
+                lines.append(drv.ocr.status())
                 return True, "\n".join(lines)
             except Exception as exc:
                 return False, f"No se pudo comprobar: {exc}"

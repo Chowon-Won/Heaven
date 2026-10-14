@@ -31,15 +31,14 @@ Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"
-Name: "tesseract"; Description: "Instalar Tesseract OCR (lee los rótulos de SisFaCon que no son controles de Windows)"; GroupDescription: "Componentes:"; Check: not TesseractInstalled
 
 [Files]
 ; Programa (generado por PyInstaller; incluye Python y todas las bibliotecas)
 Source: "dist\SisFaConAutoFacturador\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Idiomas OCR español e inglés (los usa el programa aunque Tesseract no los tenga)
 Source: "redist\tessdata\*"; DestDir: "{app}\tessdata"; Flags: ignoreversion
-; Instalador de Tesseract (solo si se elige la tarea)
-Source: "redist\tesseract-setup.exe"; DestDir: "{tmp}"; Tasks: tesseract; Flags: deleteafterinstall
+; Tesseract OCR incluido en el programa (no necesita instalarse aparte)
+Source: "redist\tesseract\*"; DestDir: "{app}\tesseract"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Documentación y plantillas
 Source: "..\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "..\plantillas\*"; DestDir: "{app}\plantillas"; Flags: ignoreversion
@@ -53,15 +52,7 @@ Name: "{group}\Desinstalar {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
-Filename: "{tmp}\tesseract-setup.exe"; Parameters: "/S"; Tasks: tesseract; StatusMsg: "Instalando Tesseract OCR..."; Flags: waituntilterminated
 Filename: "{app}\{#AppExe}"; Description: "Abrir {#AppName}"; Flags: postinstall nowait skipifsilent
 
 ; Los datos del usuario (escuelas, productos, historial) están en
 ; %LOCALAPPDATA%\SisFaConAutoFacturador y NO se borran al desinstalar.
-
-[Code]
-function TesseractInstalled: Boolean;
-begin
-  Result := FileExists(ExpandConstant('{commonpf64}\Tesseract-OCR\tesseract.exe'))
-         or FileExists(ExpandConstant('{commonpf32}\Tesseract-OCR\tesseract.exe'));
-end;

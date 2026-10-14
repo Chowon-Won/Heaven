@@ -267,7 +267,9 @@ class CalibrationOverlay(QWidget):
                 ctrl = drv._control_text_at(*rect)
                 ocr = drv.ocr.read_rect(rect, variants=True, accept=_OCR_ACCEPT.get(name))
                 text = (f"Lectura de «{SHORT.get(name, name)}»: control de Windows = «{ctrl or '—'}» · "
-                        f"OCR = «{ocr or '— (¿Tesseract instalado?)'}»")
+                        f"OCR = «{ocr or '—'}»")
+                if not ocr:
+                    text += f"<br>{drv.ocr.status()}"
             except Exception as exc:
                 text = f"No se pudo leer: {exc}"
             self.show()
