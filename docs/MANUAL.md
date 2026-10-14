@@ -99,7 +99,11 @@ acceso, recuperación…) y **Facturas**. **Exportar a CSV** exporta la vista ac
      comprueba que la cantidad se escribió bien).
    * **«0 Linea(s)»** → el rótulo bajo la tabla.
    * **Último CONDUCE** → el texto «CONDUCE: FCR …» de ULTIMAS CONDUCE REGISTRADO.
-   * **NOMBRE del centro** y **Botón Imprimir** → opcionales.
+   * **DIRECTOR** → la casilla DIRECTOR. El programa **no guarda ni muestra** el nombre: solo
+     comprueba si tiene un nombre o si quedó en «-». Si queda en «-» (pasa tras algunos errores de
+     SisFaCon), repite F7 y la selección de la escuela (hasta 3 veces). También lo comprueba justo
+     antes de grabar. Se puede desactivar en Configuración.
+   * **NOMBRE del centro** → opcional.
 5. «Texto búsqueda» casi nunca hace falta (se detecta solo). Si se necesitara: pulse F7 en
    SisFaCon y luego **«Calibrar Texto búsqueda (con F7 abierto)»**.
 

@@ -71,6 +71,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # "codigo" o "nombre": qué se escribe en «Texto búsqueda».
     "buscar_escuela_por": "codigo",
     "verificar_nombre_escuela": False,
+    # Tras elegir la escuela, la casilla DIRECTOR debe tener un nombre. Si queda en
+    # «-» (pasa tras algunos errores de SisFaCon) se repite F7 + escuela.
+    # El nombre nunca se guarda ni se muestra: solo se comprueba que no esté vacío.
+    "verificar_director": True,
+    "reintentos_director": 3,
     # Si la búsqueda por código no encuentra la escuela, reintentar por nombre
     # (o al revés). Seguro: aún no se ha introducido el producto.
     "reintentar_busqueda_alternativa": True,
@@ -162,6 +167,11 @@ CALIBRATION_FIELDS: dict[str, dict[str, str]] = {
     "nombre_centro": {
         "ventana": "principal", "tipo": "region",
         "descripcion": "Campo NOMBRE del centro educativo",
+    },
+    "director_centro": {
+        "ventana": "principal", "tipo": "region",
+        "descripcion": "Campo DIRECTOR (solo se comprueba que no esté en «-»; el nombre "
+                       "no se guarda ni se muestra)",
     },
     "ultimo_conduce": {
         "ventana": "principal", "tipo": "region",

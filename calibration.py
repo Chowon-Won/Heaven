@@ -80,11 +80,15 @@ class Calibrator:
             from window_detection import _OCR_ACCEPT
             ocr = self.driver.ocr.read_rect((x, y, w, h), variants=True,
                                             accept=_OCR_ACCEPT.get(field_name))
+        from verification import mask_private
+        ctrl, ocr = mask_private(field_name, ctrl) if ctrl else ctrl, \
+            mask_private(field_name, ocr) if ocr else ocr
         parts = [f"Control de Windows: «{ctrl}»" if ctrl else "Control de Windows: (sin texto)"]
         if entry.get("metodo") != "control":
             parts.append(f"OCR: «{ocr}»" if ocr else
                          "OCR: (sin resultado) — " + self.driver.ocr.status())
-        parts.append(f"Lectura usada por el macro: «{self.driver.read_field(field_name)}»")
+        parts.append("Lectura usada por el macro: "
+                     f"«{mask_private(field_name, self.driver.read_field(field_name))}»")
         return "\n".join(parts)
 
 

@@ -62,6 +62,7 @@ class SimulatedDriver(SisFaConDriver):
         self.has_search_button = False    # «Buscar Centro» accesible como control
         self.empty_cell_noise = ""        # lo que «lee» el OCR en una celda vacía
         self.ask_print_after_save = True  # como SisFaCon real: Ctrl+G → «¿Imprimir?»
+        self.director_blank = False       # casilla DIRECTOR en «-»
         self.needs_qty_enter = True       # como SisFaCon real: código+Enter, Cantidad+Enter
         self.desc_region_on_entry_row = True   # la descripción calibrada está en la fila azul
         self._qty_buffer = ""
@@ -234,6 +235,8 @@ class SimulatedDriver(SisFaConDriver):
             if self._fault("qty_ignored"):
                 return                       # la cantidad no se sustituyó
             self._qty_buffer = text          # la cantidad seleccionada se sustituye
+            if self._fault("director_blank_later"):
+                self.director_blank = True
         elif self.cell_focused:
             self.cell_buffer += text
 
@@ -250,6 +253,10 @@ class SimulatedDriver(SisFaConDriver):
                 return self.school[0]
             if name == "nombre_centro":
                 return self.school[1]
+            if name == "director_centro":
+                if self.school == CONTADO or self.director_blank:
+                    return " -"
+                return "DIRECTOR DE PRUEBA"
             if name == "ultimo_conduce":
                 if self.conduce_unreadable:
                     return None
@@ -309,6 +316,7 @@ class SimulatedDriver(SisFaConDriver):
             others = [(c, n) for c, n in self.clients.items() if c != match[0]]
             match = others[0] if others else ("99999", "OTRA ESCUELA")
         self.school = match
+        self.director_blank = bool(self._fault("director_blank", text))
         self.cell_focused = False
         if self._fault("av_after_select", text):
             self._open_av()

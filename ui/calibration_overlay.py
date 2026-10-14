@@ -19,6 +19,7 @@ HANDLE = 12
 SHORT = {
     "codigo_centro": "CÓDIGO del centro", "nombre_centro": "NOMBRE del centro",
     "ultimo_conduce": "Último CONDUCE (FCR …)", "contador_lineas": "«0 Linea(s)»",
+    "director_centro": "DIRECTOR (no se guarda)",
     "celda_codigo_producto": "Celda azul Código", "descripcion_producto":
     "Descripción (fila azul)", "cantidad_linea": "Cantidad (1.ª línea)",
     "texto_busqueda": "Texto búsqueda",
@@ -275,8 +276,11 @@ class CalibrationOverlay(QWidget):
             try:
                 from window_detection import _OCR_ACCEPT, RealDriver
                 drv = RealDriver(self.app.settings)
+                from verification import mask_private
                 ctrl = drv._control_text_at(*rect)
                 ocr = drv.ocr.read_rect(rect, variants=True, accept=_OCR_ACCEPT.get(name))
+                ctrl = mask_private(name, ctrl) if ctrl else ctrl
+                ocr = mask_private(name, ocr) if ocr else ocr
                 text = (f"Lectura de «{SHORT.get(name, name)}»: control de Windows = «{ctrl or '—'}» · "
                         f"OCR = «{ocr or '—'}»")
                 if not ocr:

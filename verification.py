@@ -167,3 +167,17 @@ def parse_quantity(text: str | None) -> int | None:
         if raw.isdigit():
             return int(raw)
     return None
+
+
+def is_blank_name(text: str | None) -> bool:
+    """¿La casilla está vacía o en «-»? (menos de 3 letras: «-», «—», «», ruido).
+    No compara ni guarda el nombre: solo si hay un nombre o no."""
+    letters = sum(1 for c in strip_accents(str(text or "")) if c.isalpha())
+    return letters < 3
+
+
+def mask_private(field: str, text: str | None) -> str | None:
+    """Oculta el contenido de campos privados (nombre del director)."""
+    if field != "director_centro":
+        return text
+    return "(vacío / «-»)" if is_blank_name(text) else "(con nombre — no se muestra)"

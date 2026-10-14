@@ -170,6 +170,7 @@ def _ocr_accept():
         "ultimo_conduce": lambda t: bool(parse_conduce(t)),
         "codigo_centro": lambda t: bool(re.search(r"\d{4,}|PERSONAL", t.upper())),
         "nombre_centro": lambda t: len(t.strip()) >= 4,
+        "director_centro": lambda t: len(t.strip()) > 0,
         "descripcion_producto": lambda t: len(t.strip()) >= 3,
     }
 

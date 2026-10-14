@@ -32,8 +32,8 @@ from day_manager import DayManager, DayStatus, InvoiceStatus, Mode, PrintStatus
 from error_recovery import Classified, RecoveryPolicy, WinKind, classify_window
 from logging_manager import OperationLogger
 from state_machine import STATE_LABELS, State, StateMachine
-from verification import (best_match, codes_match, normalize_text, parse_conduce,
-                          parse_line_count, parse_quantity, text_matches)
+from verification import (best_match, codes_match, is_blank_name, normalize_text,
+                          parse_conduce, parse_line_count, parse_quantity, text_matches)
 from window_detection import (CalibrationError, DriverError, EmergencyStop,
                               SisFaConDriver, WinInfo)
 
@@ -291,6 +291,8 @@ class AutomationEngine:
             needed.append("nombre_centro")
         if s["verificar_cantidad_linea"]:
             needed.append("cantidad_linea")
+        if s["verificar_director"]:
+            needed.append("director_centro")
         missing = [n for n in needed if not self.driver.is_calibrated(n)]
         if missing:
             raise FlowAbort("Falta calibrar: " + ", ".join(missing) +
@@ -324,6 +326,7 @@ class AutomationEngine:
                             self._validate_ready(ctx)
                         self._select_school(ctx)
                         self._product(ctx)
+                        self._ensure_director(ctx)
                         self._checkpoint(ctx)
                         self._confirm_before_save(ctx)
                         phase = "save"
@@ -563,7 +566,50 @@ class AutomationEngine:
                             "escuela tras grabar, vacíe «Código de un formulario nuevo» en "
                             "Configuración).", InvoiceStatus.PENDIENTE)
 
+    def _director_blank(self, ctx: InvoiceContext) -> bool:
+        """¿La casilla DIRECTOR está vacía o en «-»? (el nombre no se registra)."""
+        if not self.settings["verificar_director"] or not self.driver.is_calibrated("director_centro"):
+            return False
+        box = {"blank": True}
+
+        def filled() -> bool:
+            box["blank"] = is_blank_name(self._read("director_centro"))
+            return not box["blank"]
+
+        # Se da un momento a SisFaCon para rellenar los datos del centro.
+        self._poll_until(ctx, "director", filled, min(self._verify_timeout(), 3.0))
+        return box["blank"]
+
     def _select_school(self, ctx: InvoiceContext) -> None:
+        """Selecciona la escuela y comprueba que la casilla DIRECTOR no quede en «-».
+        Si queda en «-», repite F7 + escuela (hasta «reintentos_director» veces)."""
+        tries = max(1, int(self.settings["reintentos_director"]))
+        for attempt in range(tries + 1):
+            if attempt:
+                self.log.log("INFO", f"La casilla DIRECTOR quedó en «-»: se vuelve a seleccionar "
+                             f"la escuela con F7 (intento {attempt} de {tries}).", "AVISO",
+                             jornada=self._day, factura=ctx.inv)
+                self._goto(State.RECOVERING, "Director en «-»")
+            self._select_school_once(ctx)
+            if not self._director_blank(ctx):
+                return
+        raise FlowAbort(f"La casilla DIRECTOR sigue en «-» después de seleccionar la escuela "
+                        f"{tries + 1} veces. Revise SisFaCon. No se grabó nada.",
+                        InvoiceStatus.ERROR)
+
+    def _ensure_director(self, ctx: InvoiceContext) -> None:
+        """Justo antes de grabar: si DIRECTOR está en «-», se repite la selección de
+        la escuela y se comprueba de nuevo el producto."""
+        if not self._director_blank(ctx):
+            return
+        self.log.log("INFO", "Antes de grabar, la casilla DIRECTOR está en «-»: se vuelve a "
+                     "seleccionar la escuela con F7.", "AVISO", jornada=self._day, factura=ctx.inv)
+        self._goto(State.RECOVERING, "Director en «-» antes de grabar")
+        ctx.recovering = True
+        self._select_school(ctx)
+        self._product(ctx)          # producto ya presente → solo se verifica; si no, se escribe
+
+    def _select_school_once(self, ctx: InvoiceContext) -> None:
         """F7 -> búsqueda -> Enter -> verificar el código mostrado.
 
         Si la búsqueda no encuentra la escuela o selecciona otra, se reintenta
@@ -749,7 +795,7 @@ class AutomationEngine:
                                 + (" tras el error: revise si el formulario ya tiene el producto."
                                    if unsafe else "."), InvoiceStatus.ERROR)
             if n is not None and n > 0:
-                ok, detail = self._product_ok(1)
+                ok, detail = self._product_ok(1, ctx)
                 if ctx.recovering and n == 1 and ok:
                     # Tras la recuperación el producto correcto ya estaba cargado.
                     self._goto(State.VERIFYING_PRODUCT, "Producto ya presente")

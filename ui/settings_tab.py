@@ -35,6 +35,8 @@ FIELDS = [
         ("reintentar_busqueda_alternativa", "Si no encuentra la escuela, reintentar por el otro dato", "bool"),
         ("codigo_formulario_nuevo", "Código de un formulario nuevo (vacío = no comprobar)", "text"),
         ("verificar_nombre_escuela", "Verificar también el nombre de la escuela", "bool"),
+        ("verificar_director", "Repetir F7 si la casilla DIRECTOR queda en «-»", "bool"),
+        ("reintentos_director", "Reintentos si DIRECTOR queda en «-»", "int"),
         ("verificar_contador_lineas", "Verificar contador «Linea(s)»", "bool"),
         ("contador_lineas_opcional", "Si el contador no se puede leer, verificar solo la descripción", "bool"),
         ("verificar_descripcion_producto", "Verificar descripción del producto", "bool"),
@@ -443,10 +445,11 @@ class SettingsTab(QWidget):
                 for w in drv.capture_baseline():
                     lines.append(f"Ventana pendiente: {w.describe()} → "
                                  f"{classify_window(w, self.app.settings).kind.value}")
-                for name in ("codigo_centro", "nombre_centro", "ultimo_conduce",
-                             "contador_lineas", "descripcion_producto"):
+                from verification import mask_private
+                for name in ("codigo_centro", "nombre_centro", "director_centro",
+                             "ultimo_conduce", "contador_lineas", "descripcion_producto"):
                     if drv.is_calibrated(name):
-                        lines.append(f"{name}: «{drv.read_field(name)}»")
+                        lines.append(f"{name}: «{mask_private(name, drv.read_field(name))}»")
                 lines.append(drv.ocr.status())
                 lines.append(_admin_line(drv))
                 return True, "\n".join(lines)
