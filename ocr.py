@@ -50,23 +50,38 @@ class OcrEngine:
             self._ready = False
         return self._ready
 
-    def read_rect(self, rect, digits: bool = False) -> str | None:
+    def read_rect(self, rect, digits: bool = False, variants: bool = False) -> str | None:
+        """Lee el texto de una región de pantalla.
+
+        Con ``variants=True`` prueba varios tratamientos de imagen (útil para
+        rótulos pequeños, en cursiva o de color, como «0 Linea(s)») y devuelve
+        los resultados separados por « | » para que el llamador elija.
+        """
         if not self.available():
             return None
         try:
             from PIL import ImageGrab, ImageOps
             import pytesseract
             x, y, w, h = rect
-            img = ImageGrab.grab(bbox=(x, y, x + w, y + h), all_screens=True)
-            img = ImageOps.grayscale(img)
-            img = img.resize((img.width * 3, img.height * 3))
-            img = ImageOps.autocontrast(img)
+            shot = ImageGrab.grab(bbox=(x, y, x + w, y + h), all_screens=True)
+            gray = ImageOps.grayscale(shot)
+            big = gray.resize((gray.width * 4, gray.height * 4))
+            images = [ImageOps.autocontrast(big)]
+            if variants:
+                for limit in (110, 150, 190):
+                    images.append(big.point(lambda p, t=limit: 255 if p > t else 0))
+                images.append(ImageOps.invert(ImageOps.autocontrast(big)))
             lang = self.settings.get("idioma_ocr") or "spa+eng"
             config = "--psm 7" if h < 60 else "--psm 6"
-            try:
-                text = pytesseract.image_to_string(img, lang=lang, config=config)
-            except pytesseract.TesseractError:
-                text = pytesseract.image_to_string(img, lang="eng", config=config)
-            return text.strip() or None
+            texts = []
+            for img in images:
+                try:
+                    text = pytesseract.image_to_string(img, lang=lang, config=config)
+                except pytesseract.TesseractError:
+                    text = pytesseract.image_to_string(img, lang="eng", config=config)
+                text = " ".join(text.split())
+                if text and text not in texts:
+                    texts.append(text)
+            return " | ".join(texts) or None
         except Exception:
             return None

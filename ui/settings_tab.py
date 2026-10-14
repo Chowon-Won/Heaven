@@ -32,6 +32,7 @@ FIELDS = [
         ("buscar_escuela_por", "Buscar la escuela por", "choice", ["codigo", "nombre"]),
         ("verificar_nombre_escuela", "Verificar también el nombre de la escuela", "bool"),
         ("verificar_contador_lineas", "Verificar contador «Linea(s)»", "bool"),
+        ("contador_lineas_opcional", "Si el contador no se puede leer, verificar solo la descripción", "bool"),
         ("verificar_descripcion_producto", "Verificar descripción del producto", "bool"),
         ("exigir_cambio_ultimo_conduce", "Exigir que cambie «ULTIMAS CONDUCE REGISTRADO»", "bool"),
         ("umbral_similitud_producto", "Similitud mínima de la descripción (0-1)", "float"),

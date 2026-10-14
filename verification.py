@@ -77,12 +77,19 @@ def parse_line_count(text: str | None) -> int | None:
     """Extrae N de «N Linea(s)»."""
     if not text:
         return None
-    t = strip_accents(text)
-    m = re.search(r"(\d+)\s*L[i1l]nea", t, re.IGNORECASE)
-    if m:
-        return int(m.group(1))
-    m = re.fullmatch(r"\s*(\d+)\s*", t)
-    return int(m.group(1)) if m else None
+    # Puede venir con varias lecturas OCR separadas por « | »: vale la primera legible.
+    for part in str(text).split("|"):
+        t = strip_accents(part)
+        # El OCR confunde a menudo 0 con O/o/D/Q y 1 con l/I/|.
+        m = re.search(r"([0-9OoDQIl]{1,3})\s*[_.,:]?\s*[LI1l|][i1l!|][nm][eéc][a@]", t)
+        if m:
+            digits = m.group(1).translate(_OCR_DIGIT_FIX)
+            if digits.isdigit():
+                return int(digits)
+        m = re.fullmatch(r"\s*(\d+)\s*", t)
+        if m:
+            return int(m.group(1))
+    return None
 
 
 def parse_conduce(text: str | None) -> str:

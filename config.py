@@ -64,6 +64,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # --- Producto --------------------------------------------------------
     "verificar_descripcion_producto": True,
     "verificar_contador_lineas": True,
+    # Si el contador «Linea(s)» no se puede leer (OCR), seguir verificando
+    # solo por la descripción del producto en lugar de detenerse.
+    "contador_lineas_opcional": True,
     "umbral_similitud_producto": 0.75,
 
     # --- Guardado (flujo confirmado por el usuario) ------------------------

@@ -317,7 +317,8 @@ class RealDriver(SisFaConDriver):
             text = self._control_text_at(x, y, w, h)
             if text or method == "control":
                 return text
-        return self.ocr.read_rect((x, y, w, h), digits=name in ("codigo_centro",))
+        return self.ocr.read_rect((x, y, w, h), digits=name in ("codigo_centro",),
+                                  variants=name in ("contador_lineas", "ultimo_conduce"))
 
     def _control_text_at(self, x, y, w, h) -> str | None:
         """Texto del control de Windows situado en la región, si encaja."""

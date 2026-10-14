@@ -104,6 +104,7 @@ class InvoiceContext:
     conduce_before: str = ""
     print_confirmed: bool = False
     recovering: bool = False
+    product_typed: bool = False   # ya se escribió el código del producto alguna vez
     attempts: int = 0
     notes: list[str] = field(default_factory=list)
 
@@ -191,6 +192,7 @@ class AutomationEngine:
         self._stop.clear()
         self._resume.set()
         self._running = True
+        self._counter_warned = False
         self.sm.reset()
         completed = halted = 0
         reason = ""
@@ -273,7 +275,7 @@ class AutomationEngine:
         if self.driver.simulated:
             return
         needed = ["codigo_centro", "celda_codigo_producto"]
-        if s["verificar_contador_lineas"]:
+        if s["verificar_contador_lineas"] and not self._counter_optional():
             needed.append("contador_lineas")
         if s["verificar_descripcion_producto"]:
             needed.append("descripcion_producto")
@@ -438,6 +440,17 @@ class AutomationEngine:
     def _read_lines(self) -> int | None:
         return parse_line_count(self._read("contador_lineas"))
 
+    def _counter_optional(self) -> bool:
+        """El contador puede omitirse si es ilegible y hay verificación por descripción."""
+        s = self.settings
+        return bool(s["contador_lineas_opcional"]) and bool(s["verificar_descripcion_producto"])
+
+    def _warn_counter(self, ctx: InvoiceContext) -> None:
+        if not getattr(self, "_counter_warned", False):
+            self._counter_warned = True
+            self.log.log("INFO", "No se puede leer el contador «Linea(s)»: se verifica el producto "
+                         "solo por su descripción.", "AVISO", jornada=self._day, factura=ctx.inv)
+
     def _poll_until(self, ctx, what: str, check: Callable[[], bool], timeout: float,
                     allowed: set[WinKind] = frozenset()) -> bool:
         end = time.monotonic() + timeout
@@ -503,10 +516,12 @@ class AutomationEngine:
                             InvoiceStatus.PENDIENTE)
         if self.settings["verificar_contador_lineas"]:
             n = self._read_lines()
-            if n is None:
+            if n is None and self._counter_optional():
+                self._warn_counter(ctx)
+            elif n is None:
                 raise FlowAbort("No se pudo leer el contador «Linea(s)». Revise la calibración "
                                 "o la instalación de Tesseract.", InvoiceStatus.PENDIENTE)
-            if n != 0:
+            elif n != 0:
                 raise FlowAbort(f"El formulario tiene {n} línea(s): no es una factura nueva. "
                                 "Cancele o limpie el formulario en SisFaCon.",
                                 InvoiceStatus.PENDIENTE)
@@ -556,8 +571,9 @@ class AutomationEngine:
         good = True
         if s["verificar_contador_lineas"]:
             n = self._read_lines()
-            detail.append(f"líneas={n}")
-            good &= n == expect_lines
+            detail.append(f"líneas={n if n is not None else 'ilegible'}")
+            if n is not None or not self._counter_optional():
+                good &= n == expect_lines
         if s["verificar_descripcion_producto"]:
             desc = self._read("descripcion_producto")
             detail.append(f"descripción=«{desc}»")
@@ -569,9 +585,12 @@ class AutomationEngine:
         day = self._day
         if self.settings["verificar_contador_lineas"]:
             n = self._read_lines()
-            if n is None:
-                raise FlowAbort("No se pudo leer el contador de líneas.", InvoiceStatus.ERROR)
-            if n > 0:
+            unsafe = ctx.recovering and ctx.product_typed
+            if n is None and (unsafe or not self._counter_optional()):
+                raise FlowAbort("No se pudo leer el contador de líneas"
+                                + (" tras el error: revise si el formulario ya tiene el producto."
+                                   if unsafe else "."), InvoiceStatus.ERROR)
+            if n is not None and n > 0:
                 ok, detail = self._product_ok(1)
                 if ctx.recovering and n == 1 and ok:
                     # Tras la recuperación el producto correcto ya estaba cargado.
@@ -586,6 +605,7 @@ class AutomationEngine:
         self._update(ctx)
         self.driver.focus_main()
         self.driver.click_point("celda_codigo_producto")
+        ctx.product_typed = True
         self.driver.type_text(day["producto_codigo"])
         self.driver.send_keys(self.settings["teclas_tras_codigo_producto"])
         self.log.log("PRODUCTO_INTRODUCIDO", jornada=day, factura=ctx.inv)

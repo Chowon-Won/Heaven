@@ -54,6 +54,7 @@ class SimulatedDriver(SisFaConDriver):
         self.ok_presses: list[str] = []
         self.faults: list[dict] = []
         self.emergency = False
+        self.counter_unreadable = False   # imita un OCR que no lee «Linea(s)»
 
     # ------------------------------------------------------------ fallos
     def inject(self, event: str, code: str | None = None, times: int = 1, **kw) -> None:
@@ -215,7 +216,7 @@ class SimulatedDriver(SisFaConDriver):
             if name == "ultimo_conduce":
                 return f"CONDUCE: FCR {self.last_conduce - (1 if self.label_stale else 0):07d}"
             if name == "contador_lineas":
-                return f"{len(self.lines)} Linea(s)"
+                return None if self.counter_unreadable else f"{len(self.lines)} Linea(s)"
             if name == "descripcion_producto":
                 return self.entry_desc or (self.lines[-1][1] if self.lines else "")
         return None
