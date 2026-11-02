@@ -3,11 +3,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QInputDialog,
-                               QLabel, QMessageBox, QPushButton, QTableWidget, QVBoxLayout,
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QHeaderView, QLabel, QMessageBox, QPushButton, QTableWidget, QVBoxLayout,
                                QWidget)
 
-from catalog_base import CatalogError
 from import_export import read_table, write_table
 from menu_manager import DAY_KEYS, DIAS, SEMANAS, MenuManager, import_menu
 
@@ -34,6 +32,9 @@ class MenuTab(QWidget):
         buttons.addStretch(1)
         lay = QVBoxLayout(self)
         lay.addLayout(buttons)
+        lay.addWidget(QLabel("En el Excel cada casilla puede llevar «Nombre — código», solo el "
+                             "código o solo el nombre. El menú solo usa productos que ya están en "
+                             "Productos; no crea ninguno.", objectName="Hint"))
         lay.addWidget(QLabel("Elija el producto de cada día. Los sábados tienen su propio menú "
                              "(columna Sábado). Al crear una jornada, el producto se propone "
                              "solo según la fecha; siempre se puede cambiar.", objectName="Hint"))
@@ -97,24 +98,12 @@ class MenuTab(QWidget):
             QMessageBox.warning(self, "Menú", f"No se pudo leer el archivo: {exc}")
             return
         report = import_menu(self.app.menu, rows, self.app.products.list())
-        # Productos del menú que aún no están en el catálogo: se pide su código.
-        for name, where in list(report["faltan"].items()):
-            code, ok = QInputDialog.getText(
-                self, "Producto nuevo",
-                f"«{name}» está en el menú ({', '.join(where[:3])}…) pero no en Productos.\n"
-                "Escriba su CÓDIGO en SisFaCon para añadirlo (o Cancelar para saltarlo):")
-            if not ok or not code.strip():
-                continue
-            try:
-                self.app.products.add(nombre=name, codigo=code.strip())
-            except CatalogError as exc:
-                QMessageBox.warning(self, "Producto", str(exc))
-        if report["faltan"]:
-            report = import_menu(self.app.menu, rows, self.app.products.list())
         lines = [f"Casillas asignadas: {report['asignadas']}"]
         if report["faltan"]:
-            lines.append("Sin asignar (producto no está en el catálogo): "
-                         + ", ".join(report["faltan"]))
+            lines.append("\nNo están en Productos (esas casillas no se cambiaron):")
+            lines += [f"• {name}  ({', '.join(where)})" for name, where in report["faltan"].items()]
+            lines.append("\nSi los necesita, añádalos en la pestaña Productos con su código y "
+                         "vuelva a importar el menú.")
         lines += report["errores"]
         QMessageBox.information(self, "Menú importado", "\n".join(lines))
         self.refresh()
@@ -130,7 +119,7 @@ class MenuTab(QWidget):
             row = [s]
             for d in range(len(DIAS)):
                 p = self.app.products.get(grid[(s, d)]) if (s, d) in grid else None
-                row.append(p["nombre"] if p else "")
+                row.append(f"{p['nombre']} — {p['codigo']}" if p else "")
             rows.append(row)
         write_table(path, ["Semana"] + DIAS, rows)
         QMessageBox.information(self, "Menú", "Menú exportado.")

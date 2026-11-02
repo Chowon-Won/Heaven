@@ -87,16 +87,32 @@ def parse_week(value) -> int | None:
     return None
 
 
-def import_menu(menu: "MenuManager", rows: list[dict], products: list[dict]) -> dict:
-    """Carga el menú desde filas {semana, lunes … sabado} con NOMBRES de producto.
+def parse_cell(text: str) -> tuple[str, str]:
+    """«Pan — 1000», «Pan - 1000», «Pan (1000)», «1000» o «Pan» → (nombre, código)."""
+    import re
+    text = str(text or "").strip()
+    if text.endswith(".0") and text[:-2].isdigit():
+        text = text[:-2]
+    if re.fullmatch(r"\d+", text):
+        return "", text
+    m = re.fullmatch(r"(.*?)\s*(?:[—–\-:/|]\s*|\(\s*)(\d+)\s*\)?", text)
+    if m and m.group(1).strip():
+        return m.group(1).strip(), m.group(2)
+    return re.sub(r"[\s—–\-:/|(]+$", "", text), ""     # «Pan —» sin código
 
-    Cada nombre se busca en el catálogo por nombre exacto (sin mayúsculas ni
-    acentos). Las casillas vacías no cambian nada. Devuelve un resumen con los
-    nombres que no existen en el catálogo (para darlos de alta con su código).
+
+def import_menu(menu: "MenuManager", rows: list[dict], products: list[dict]) -> dict:
+    """Carga el menú desde filas {semana, lunes … sabado}. NO crea productos.
+
+    Cada casilla puede tener el nombre, el código o «nombre — código». Con código
+    se busca por código; con solo nombre, por nombre exacto (sin mayúsculas ni
+    acentos). Lo que no esté en Productos se informa y la casilla no cambia.
+    Las casillas vacías tampoco cambian nada.
     """
     from verification import normalize_text
-    by_name = {}
+    by_name, by_code = {}, {}
     for p in products:
+        by_code[str(p.get("codigo"))] = p
         for key in (p.get("nombre"), p.get("texto_verificacion")):
             if key:
                 by_name.setdefault(normalize_text(key), p)
@@ -108,14 +124,15 @@ def import_menu(menu: "MenuManager", rows: list[dict], products: list[dict]) -> 
                 report["errores"].append(f"Fila {n}: semana «{row.get('semana')}» no válida (1 a 5).")
             continue
         for dia, key in enumerate(DAY_KEYS):
-            name = str(row.get(key) or "").strip()
-            if not name:
+            cell = str(row.get(key) or "").strip()
+            if not cell:
                 continue
-            p = by_name.get(normalize_text(name))
+            name, code = parse_cell(cell)
+            p = by_code.get(code) if code else by_name.get(normalize_text(name))
             if p:
                 menu.set(week, dia, p["id"])
                 report["asignadas"] += 1
             else:
-                report["faltan"].setdefault(name, []).append(MenuManager.label(week, dia))
+                label = f"{name} — {code}" if name and code else (name or f"código {code}")
+                report["faltan"].setdefault(label, []).append(MenuManager.label(week, dia))
     return report
-

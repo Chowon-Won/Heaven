@@ -94,3 +94,28 @@ class TestImportarMenu(unittest.TestCase):
         self.assertIsNone(ctx.menu.get(1, 3))            # casilla vacía no cambia
         self.assertEqual([parse_week(x) for x in ("III", "Semana 5", "2", "6", "V2 2025")],
                          [3, 5, 2, None, None])
+
+
+class TestCodigosEnElMenu(unittest.TestCase):
+    def test_formatos_de_casilla(self):
+        from menu_manager import parse_cell
+        self.assertEqual(parse_cell("Muffin de maíz — 1012"), ("Muffin de maíz", "1012"))
+        self.assertEqual(parse_cell("Muffin de maíz - 1012"), ("Muffin de maíz", "1012"))
+        self.assertEqual(parse_cell("Muffin de maíz (1012)"), ("Muffin de maíz", "1012"))
+        self.assertEqual(parse_cell("1012"), ("", "1012"))
+        self.assertEqual(parse_cell("1012.0"), ("", "1012"))
+        self.assertEqual(parse_cell("Pan de zanahoria"), ("Pan de zanahoria", ""))
+        self.assertEqual(parse_cell("Galleta de avena — "), ("Galleta de avena", ""))
+
+    def test_codigo_busca_y_no_crea_nada(self):
+        from menu_manager import import_menu
+        ctx = make_ctx(0)
+        antes = len(ctx.products.list())
+        rows = [{"semana": "1", "lunes": "1000", "martes": "Muffin de maíz — 1012",
+                 "miercoles": "Pan de zanahoria (1005)", "jueves": "9999"}]
+        r = import_menu(ctx.menu, rows, ctx.products.list())
+        self.assertEqual(r["asignadas"], 2)
+        self.assertEqual(sorted(r["faltan"]), ["Muffin de maíz — 1012", "código 9999"])
+        self.assertEqual(len(ctx.products.list()), antes)        # no se creó nada
+        self.assertIsNone(ctx.menu.get(1, 1))
+        self.assertEqual(ctx.products.get(ctx.menu.get(1, 0))["nombre"], "Pan")
