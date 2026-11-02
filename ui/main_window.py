@@ -11,6 +11,7 @@ from ui.controller import AutomationController
 from ui.dashboard_tab import DashboardTab
 from ui.day_tab import DayTab
 from ui.history_tab import HistoryTab
+from ui.menu_tab import MenuTab
 from ui.mini_panel import MiniPanel
 from ui.settings_tab import SettingsTab
 
@@ -34,11 +35,13 @@ class MainWindow(QMainWindow):
         self.dashboard = DashboardTab(app_ctx, self.ctl, self.automation)
         self.schools = CatalogTab(app_ctx, "escuelas")
         self.products = CatalogTab(app_ctx, "productos")
+        self.menu = MenuTab(app_ctx)
         self.day = DayTab(app_ctx)
         self.history = HistoryTab(app_ctx)
         self.settings = SettingsTab(app_ctx, self.ctl)
         for w, title in ((self.dashboard, "Panel principal"), (self.schools, "Escuelas"),
-                         (self.products, "Productos"), (self.day, "Nueva jornada"),
+                         (self.products, "Productos"), (self.menu, "Menú"),
+                         (self.day, "Nueva jornada"),
                          (self.automation, "Automatización"), (self.history, "Historial y registros"),
                          (self.settings, "Configuración")):
             self.tabs.addTab(w, title)

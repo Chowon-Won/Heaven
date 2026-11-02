@@ -114,6 +114,14 @@ CREATE TABLE IF NOT EXISTS eventos (
 );
 CREATE INDEX IF NOT EXISTS ix_eventos_fecha ON eventos(fecha_hora);
 
+-- Menú: qué producto toca cada día (lunes..sábado) de cada semana (1..5) del mes.
+CREATE TABLE IF NOT EXISTS menu (
+    semana      INTEGER NOT NULL,
+    dia         INTEGER NOT NULL,      -- 0 = lunes … 5 = sábado
+    producto_id INTEGER,
+    PRIMARY KEY (semana, dia)
+);
+
 CREATE TABLE IF NOT EXISTS configuraciones_frecuentes (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre       TEXT NOT NULL UNIQUE,

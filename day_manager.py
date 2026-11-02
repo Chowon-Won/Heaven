@@ -103,6 +103,22 @@ class DayManager:
     def latest_day(self) -> dict | None:
         return self.db.query_one("SELECT * FROM jornadas ORDER BY id DESC LIMIT 1")
 
+    def delete_day(self, day_id: int) -> int:
+        """Elimina la jornada y sus facturas del programa (no toca SisFaCon).
+        El registro de eventos se conserva. Devuelve cuántas facturas se quitaron."""
+        with self.db.transaction():
+            n = self.db._conn.execute("DELETE FROM facturas WHERE jornada_id = ?",
+                                      (day_id,)).rowcount
+            self.db._conn.execute("DELETE FROM jornadas WHERE id = ?", (day_id,))
+        return n
+
+    def previous_day(self, fecha: str, real: bool) -> dict | None:
+        """La jornada anterior a esa fecha (del mismo tipo: real o simulada)."""
+        op = "!=" if real else "="
+        return self.db.query_one(
+            f"SELECT * FROM jornadas WHERE fecha < ? AND modo {op} 'SIMULADO' "
+            "ORDER BY fecha DESC, id DESC LIMIT 1", (fecha,))
+
     def set_day_status(self, day_id: int, estado: str) -> None:
         extra = ""
         if estado == DayStatus.EN_CURSO:

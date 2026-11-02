@@ -79,7 +79,9 @@ class DayTab(QWidget):
         for b in (add, edit, admin):
             row.addWidget(b)
         row.addStretch(1)
-        self._page(QLabel("Producto de la jornada:"), self.product, row,
+        self.menu_hint = QLabel(objectName="Card")
+        self.menu_hint.setWordWrap(True)
+        self._page(self.menu_hint, QLabel("Producto de la jornada:"), self.product, row,
                    QLabel("Solo se muestran productos activos.", objectName="Hint"))
 
     def _build_code(self):
@@ -160,6 +162,7 @@ class DayTab(QWidget):
         idx = max(0, min(idx, len(STEPS) - 1))
         if idx == 1:
             self.reload_products()
+            self._apply_menu()
         if idx == 2:
             p = self.current_product()
             if p:
@@ -181,8 +184,14 @@ class DayTab(QWidget):
 
     def on_next(self):
         idx = self.stack.currentIndex()
+        if idx == 0 and self.date.date().dayOfWeek() == 7 and not confirm(
+                self, "Domingo", "La fecha elegida es DOMINGO. Las jornadas son de lunes a "
+                                 "sábado.\n\n¿Estás seguro que quieres continuar?"):
+            return
         if idx == 1 and not self.current_product():
             return error(self, "Seleccione un producto.")
+        if idx == 1 and not self._confirm_repeated_product():
+            return
         if idx == 2 and not self.code_ok.isChecked():
             return error(self, "Confirme el código del producto para continuar.")
         if idx == 3 and not self.checked_schools():
@@ -196,6 +205,48 @@ class DayTab(QWidget):
         if idx == len(STEPS) - 1:
             return self.create_day()
         self.go(idx + 1)
+
+    # ----------------------------------------------------------------- menú
+    def _qdate(self):
+        from datetime import date
+        d = self.date.date()
+        return date(d.year(), d.month(), d.day())
+
+    def _apply_menu(self):
+        """Propone el producto del menú según la fecha elegida."""
+        from menu_manager import MenuManager
+        pid, semana, dia = self.app.menu.product_for_date(self._qdate())
+        where = MenuManager.label(semana, dia)
+        if dia is None:
+            self.menu_hint.setText(f"Fecha: <b>{where}</b> — los domingos no hay menú.")
+            return
+        if pid:
+            self.reload_products(pid)
+            p = self.app.products.get(pid)
+            self.menu_hint.setText(f"Según el menú (<b>{where}</b>): <b>{p['nombre']} — "
+                                   f"{p['codigo']}</b>. Puede cambiarlo si hace falta.")
+        else:
+            self.menu_hint.setText(f"Menú (<b>{where}</b>): sin producto asignado. Elíjalo "
+                                   "abajo o complete la pestaña «Menú».")
+
+    def _confirm_repeated_product(self) -> bool:
+        """Aviso si el producto ya se dio en la jornada (real) anterior."""
+        p = self.current_product()
+        if not p:
+            return True
+        fecha = self.date.date().toString("yyyy-MM-dd")
+        if getattr(self, "_repeat_ok", None) == (p["id"], fecha):
+            return True                      # ya lo confirmó en este asistente
+        prev = self.app.days.previous_day(fecha, real=True)
+        if not prev or str(prev["producto_codigo"]) != str(p["codigo"]):
+            return True
+        ok = confirm(self, "Producto repetido",
+                     f"«{p['nombre']}» ({p['codigo']}) ya se dio en la jornada anterior "
+                     f"(#{prev['id']} del {prev['fecha']}).\n\n"
+                     "¿Estás seguro que quieres continuar?")
+        if ok:
+            self._repeat_ok = (p["id"], fecha)
+        return ok
 
     # ------------------------------------------------------------- productos
     def reload_products(self, select_id: int | None = None):
@@ -361,6 +412,8 @@ class DayTab(QWidget):
         schools = self.checked_schools()
         fecha = self.date.date().toString("yyyy-MM-dd")
         real = self.mode_real.isChecked()
+        if real and not self._confirm_repeated_product():
+            return
         if real:
             dup = self.app.days.schools_already_processed(fecha, [s["codigo"] for s in schools])
             if dup:
@@ -393,5 +446,6 @@ class DayTab(QWidget):
                             f"{day['producto_nombre']} — {day['producto_codigo']}", jornada=day)
         QMessageBox.information(self, "Jornada creada",
                                 f"Jornada #{day_id} creada con {len(schools)} facturas previstas.")
+        self._repeat_ok = None
         self.day_created.emit(day_id)
         self.go(0)

@@ -8,6 +8,7 @@ import config
 from config import Settings
 from database import Database
 from day_manager import DayManager, Mode
+from menu_manager import MenuManager
 from logging_manager import OperationLogger
 from product_manager import ProductManager
 from school_manager import SchoolManager
@@ -22,6 +23,7 @@ class AppContext:
     days: DayManager
     logger: OperationLogger
     data_dir: Path | None
+    menu: MenuManager | None = None
 
     @classmethod
     def create(cls, db_path: str | Path | None = None, data_dir: Path | None = None,
@@ -33,7 +35,7 @@ class AppContext:
         ctx = cls(db=db, settings=Settings(db), schools=SchoolManager(db),
                   products=ProductManager(db), days=DayManager(db),
                   logger=OperationLogger(db, (data_dir / "registros") if data_dir else None),
-                  data_dir=data_dir)
+                  data_dir=data_dir, menu=MenuManager(db))
         if seed:
             ctx.products.seed_examples_if_empty()
         from calibration import drop_untouched_defaults

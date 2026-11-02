@@ -22,6 +22,7 @@ EV = {
     "JORNADA_DETENIDA": "Jornada detenida",
     "JORNADA_COMPLETADA": "Jornada completada",
     "JORNADA_INTERRUMPIDA": "Jornada interrumpida detectada",
+    "JORNADA_ELIMINADA": "Jornada eliminada",
     "PRODUCTO_SELECCIONADO": "Producto seleccionado",
     "ESCUELA_SELECCIONADA": "Escuela seleccionada",
     "ESCUELA_INCORRECTA": "Escuela incorrecta",

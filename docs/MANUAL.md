@@ -29,9 +29,18 @@ Igual que Escuelas. Campos:
 * **Descripción que muestra SisFaCon**: el texto que aparece en la columna Descripción al teclear el
   código. Si se deja vacío se compara con el nombre. Se admiten pequeñas diferencias (configurable).
 
+### Menú
+Pestaña **Menú**: una tabla de 5 semanas × (lunes a viernes + sábado). En cada casilla se elige el
+producto de ese día. Los sábados tienen su propio menú (columna Sábado). Abajo se ve qué toca hoy.
+* Semana del mes: la semana 1 es la primera semana (lunes a domingo) que tiene algún día de lunes a
+  sábado en el mes; si un mes tiene 6 semanas, la 6.ª usa el menú de la semana 1.
+* Al crear una jornada, el producto se propone solo según la fecha; siempre se puede cambiar.
+
 ### 4. Nueva jornada (asistente en 6 pasos)
-1. **Fecha** (debe coincidir con la FECHA que muestra SisFaCon).
-2. **Producto**: lista desplegable «Pan — 1000». Botones *Añadir producto*, *Editar productos* y
+1. **Fecha** (debe coincidir con la FECHA que muestra SisFaCon). Se puede elegir cualquier día de
+   lunes a **sábado**; si elige un domingo, pregunta si está seguro.
+2. **Producto**: se propone el del **menú** de ese día. Si el producto es el mismo de la jornada
+   anterior, pregunta **«¿Estás seguro que quieres continuar?»**. Lista desplegable «Pan — 1000». Botones *Añadir producto*, *Editar productos* y
    *Administrar catálogo* sin salir del asistente.
 3. **Confirmar código**: marque la casilla tras comprobar el código.
 4. **Escuelas**: marque las escuelas. *Seleccionar todas las activas*, *Desmarcar todas*, buscar,
@@ -48,7 +57,8 @@ La jornada guarda una **copia** del producto y de las escuelas: editar el catál
 el código de las facturas de esa jornada.
 
 ### 5. Automatización
-* **Jornada**: elija la jornada a procesar.
+* **Jornada**: elija la jornada a procesar. **Eliminar jornada** la quita del programa (con
+  confirmación). No borra conduces de SisFaCon; el historial de eventos se conserva.
 * **Modo**: Simulado (jornadas simuladas), Prueba o Automático (jornadas reales).
 * **Ejecutar rango**: elija «Desde la escuela» y «hasta» (por su número # en la jornada) y se
   procesan solo las pendientes de ese tramo; las completadas o en revisión se saltan.

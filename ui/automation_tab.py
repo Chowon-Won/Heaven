@@ -59,6 +59,9 @@ class AutomationTab(QWidget):
         day_row.addWidget(QLabel("Jornada:"))
         day_row.addWidget(self.day_combo, 1)
         day_row.addWidget(refresh)
+        delete = QPushButton("Eliminar jornada", objectName="Danger")
+        delete.clicked.connect(self.delete_day)
+        day_row.addWidget(delete)
 
         # --- modo
         self.r_sim = QRadioButton("Simulado")
@@ -178,6 +181,29 @@ class AutomationTab(QWidget):
     def current_day(self) -> dict | None:
         did = self.day_combo.currentData()
         return self.app.days.get_day(did) if did else None
+
+    def delete_day(self):
+        day = self.current_day()
+        if not day:
+            return
+        if self.ctl.running:
+            return error(self, "Detenga la automatización antes de eliminar una jornada.")
+        c = self.app.days.counts(day["id"])
+        text = (f"¿Eliminar la jornada #{day['id']} del {day['fecha']} "
+                f"({day['producto_nombre']}, {c['total']} escuelas)?")
+        done = c["completadas"] + c["revision"]
+        if day["modo"] != Mode.SIMULADO and done:
+            text += (f"\n\nATENCIÓN: {done} factura(s) ya están grabadas o en revisión. "
+                     "Eliminar la jornada NO borra esos conduces de SisFaCon; solo los quita de "
+                     "este programa, que dejará de avisar si vuelve a facturar esas escuelas "
+                     "ese día.")
+        text += "\n\nEl historial de eventos se conserva."
+        if not confirm(self, "Eliminar jornada", text):
+            return
+        n = self.app.days.delete_day(day["id"])
+        self.app.logger.log("JORNADA_ELIMINADA", f"Jornada #{day['id']} del {day['fecha']} "
+                            f"({n} facturas) eliminada.", "AVISO", jornada=day)
+        self.reload_days()
 
     def _day_changed(self, *_):
         day = self.current_day()
