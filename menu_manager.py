@@ -67,3 +67,55 @@ class MenuManager:
     @staticmethod
     def label(semana: int, dia: int | None) -> str:
         return f"Semana {semana}, {DIAS[dia] if dia is not None else 'Domingo'}"
+
+
+# ---------------------------------------------------------------- importación
+_ROMAN = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5}
+DAY_KEYS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
+
+
+def parse_week(value) -> int | None:
+    """«1», «I», «Semana 2», «SEMANA III» → número de semana (1..5); si no, None."""
+    import re
+    text = str(value or "").upper().replace("SEMANA", "").strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    if text in _ROMAN:
+        return _ROMAN[text]
+    if re.fullmatch(r"\d", text) and 1 <= int(text) <= SEMANAS:
+        return int(text)
+    return None
+
+
+def import_menu(menu: "MenuManager", rows: list[dict], products: list[dict]) -> dict:
+    """Carga el menú desde filas {semana, lunes … sabado} con NOMBRES de producto.
+
+    Cada nombre se busca en el catálogo por nombre exacto (sin mayúsculas ni
+    acentos). Las casillas vacías no cambian nada. Devuelve un resumen con los
+    nombres que no existen en el catálogo (para darlos de alta con su código).
+    """
+    from verification import normalize_text
+    by_name = {}
+    for p in products:
+        for key in (p.get("nombre"), p.get("texto_verificacion")):
+            if key:
+                by_name.setdefault(normalize_text(key), p)
+    report = {"asignadas": 0, "faltan": {}, "errores": []}
+    for n, row in enumerate(rows, start=2):
+        week = parse_week(row.get("semana"))
+        if week is None:
+            if any(str(v or "").strip() for v in row.values()):
+                report["errores"].append(f"Fila {n}: semana «{row.get('semana')}» no válida (1 a 5).")
+            continue
+        for dia, key in enumerate(DAY_KEYS):
+            name = str(row.get(key) or "").strip()
+            if not name:
+                continue
+            p = by_name.get(normalize_text(name))
+            if p:
+                menu.set(week, dia, p["id"])
+                report["asignadas"] += 1
+            else:
+                report["faltan"].setdefault(name, []).append(MenuManager.label(week, dia))
+    return report
+

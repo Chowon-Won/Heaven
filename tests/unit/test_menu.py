@@ -75,3 +75,22 @@ class TestJornadas(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestImportarMenu(unittest.TestCase):
+    def test_importa_por_nombre_y_avisa_de_los_que_faltan(self):
+        from menu_manager import import_menu, parse_week
+        ctx = make_ctx(0)
+        rows = [{"semana": "I", "lunes": "Pan", "martes": "Muffin de zanahoria",
+                 "miercoles": "PAN", "jueves": "", "viernes": "Pan de zanahoria", "sabado": ""},
+                {"semana": "Menú PAE-Urbano V2 2025", "lunes": "", "martes": ""}]
+        r = import_menu(ctx.menu, rows, ctx.products.list())
+        self.assertEqual(r["asignadas"], 3)
+        self.assertEqual(list(r["faltan"]), ["Muffin de zanahoria"])
+        pan = ctx.products.get_by_code("1000")["id"]
+        zan = ctx.products.get_by_code("1005")["id"]
+        self.assertEqual(ctx.menu.get(1, 0), pan)
+        self.assertEqual(ctx.menu.get(1, 4), zan)        # «Pan de zanahoria» ≠ «Pan»
+        self.assertIsNone(ctx.menu.get(1, 3))            # casilla vacía no cambia
+        self.assertEqual([parse_week(x) for x in ("III", "Semana 5", "2", "6", "V2 2025")],
+                         [3, 5, 2, None, None])

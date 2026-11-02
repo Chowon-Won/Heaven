@@ -17,6 +17,7 @@ HEADER_ALIASES = {
     "orden": "orden", "orden ruta": "orden", "orden en la ruta": "orden", "no": "orden",
     "cantidad": "cantidad", "cant": "cantidad", "raciones": "cantidad",
     "cant raciones": "cantidad", "cantidad raciones": "cantidad",
+    "semana": "semana", "miercoles": "miercoles", "sabado": "sabado",
     "activo": "activo", "estado": "activo", "activa": "activo",
     "notas": "notas", "nota": "notas", "observaciones": "notas",
     "descripcion": "descripcion",
